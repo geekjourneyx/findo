@@ -145,17 +145,21 @@ function extractArchive(archivePath, extractDir) {
   }
 
   if (archiveName.endsWith(".zip") && process.platform === "win32") {
+    const archiveLiteral = powershellSingleQuoted(archivePath);
+    const extractLiteral = powershellSingleQuoted(extractDir);
     execFileSync("powershell.exe", [
       "-NoProfile",
       "-Command",
-      "Expand-Archive -LiteralPath $args[0] -DestinationPath $args[1] -Force",
-      archivePath,
-      extractDir,
+      `Expand-Archive -LiteralPath ${archiveLiteral} -DestinationPath ${extractLiteral} -Force`,
     ]);
     return;
   }
 
   throw new Error(`unsupported archive format for this platform: ${archiveName}`);
+}
+
+function powershellSingleQuoted(value) {
+  return `'${String(value).replace(/'/g, "''")}'`;
 }
 
 function readTarString(buffer, start, length) {
