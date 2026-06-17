@@ -1,0 +1,40 @@
+<svg width="1600" height="900" viewBox="0 0 1600 900" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="glow" cx="72%" cy="45%" r="48%">
+      <stop offset="0%" stop-color="#b99750" stop-opacity="0.42"/>
+      <stop offset="42%" stop-color="#6f5728" stop-opacity="0.12"/>
+      <stop offset="100%" stop-color="#050505" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="gold" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#f5d67a"/>
+      <stop offset="100%" stop-color="#9d7a33"/>
+    </linearGradient>
+    <filter id="soft" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="18"/>
+    </filter>
+  </defs>
+  <rect width="1600" height="900" fill="#050505"/>
+  <rect width="1600" height="900" fill="url(#glow)"/>
+  <g opacity="0.22" filter="url(#soft)">
+    <circle cx="1170" cy="384" r="150" fill="#b99750"/>
+    <rect x="1010" y="535" width="430" height="26" rx="13" fill="#d4ad57"/>
+  </g>
+  <g opacity="0.9">
+    <rect x="932" y="244" width="438" height="360" rx="6" fill="none" stroke="#80642d" stroke-width="1.4"/>
+    <path d="M998 340h180M998 394h270M998 448h128" stroke="#f3f0e8" stroke-width="15" stroke-linecap="round" opacity="0.88"/>
+    <path d="M998 512h320" stroke="url(#gold)" stroke-width="10" stroke-linecap="round"/>
+    <path d="M1060 300l-36 28 36 28M1268 300l36 28-36 28" fill="none" stroke="#c7a155" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+  <text x="118" y="238" fill="#cda85a" font-family="Inter, Arial, sans-serif" font-size="31" font-weight="700" letter-spacing="2">CHINESE WEB API SEARCH</text>
+  <text x="112" y="382" fill="#f5f1e8" font-family="Inter, Arial, sans-serif" font-size="138" font-weight="800">Findo</text>
+  <text x="120" y="465" fill="#b8b4aa" font-family="Inter, Arial, sans-serif" font-size="42" font-weight="600">Chinese web sources from one CLI</text>
+  <line x1="120" y1="538" x2="242" y2="538" stroke="url(#gold)" stroke-width="6" stroke-linecap="round"/>
+  <g font-family="Inter, Arial, sans-serif" font-size="30" font-weight="700">
+    <rect x="120" y="604" width="158" height="58" rx="4" fill="#11100c" stroke="#6e5729"/>
+    <text x="156" y="643" fill="#f5f1e8">Bocha</text>
+    <rect x="302" y="604" width="288" height="58" rx="4" fill="#11100c" stroke="#6e5729"/>
+    <text x="338" y="643" fill="#f5f1e8">Volcengine</text>
+    <rect x="614" y="604" width="154" height="58" rx="4" fill="#11100c" stroke="#6e5729"/>
+    <text x="649" y="643" fill="#f5f1e8">Zhihu</text>
+  </g>
+</svg>
