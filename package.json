@@ -1,0 +1,34 @@
+{
+  "name": "@geekjourneyx/findo",
+  "version": "1.0.0",
+  "description": "Install the findo CLI from the matching GitHub Release bundle.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/geekjourneyx/findo.git"
+  },
+  "homepage": "https://github.com/geekjourneyx/findo#readme",
+  "bugs": {
+    "url": "https://github.com/geekjourneyx/findo/issues"
+  },
+  "bin": {
+    "findo": "scripts/run.js"
+  },
+  "scripts": {
+    "pack:check": "npm pack --json --dry-run",
+    "postinstall": "node scripts/install.js"
+  },
+  "files": [
+    "scripts/install.js",
+    "scripts/run.js",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

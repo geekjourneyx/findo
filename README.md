@@ -15,6 +15,17 @@ Findo queries Bocha, Volcengine Ark, and Zhihu through provider APIs, then retur
 
 ## Install
 
+Recommended:
+
+```bash
+npm install -g @geekjourneyx/findo
+findo version
+```
+
+The npm package installs the matching GitHub Release binary for your platform and verifies it against `SHA256SUMS`.
+
+Alternative Go install:
+
 ```bash
 go install github.com/geekjourneyx/findo/cmd/findo@v1.0.0
 ```

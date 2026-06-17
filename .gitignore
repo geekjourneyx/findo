@@ -1,5 +1,6 @@
 /findo
 /dist/
+/bin/
 /.env
 /.DS_Store
 /prd.md

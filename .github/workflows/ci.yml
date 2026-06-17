@@ -23,11 +23,19 @@ jobs:
           go-version-file: go.mod
           cache: true
 
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
       - name: Download modules
         run: go mod download
 
       - name: Build
         run: make build
+
+      - name: Check npm package
+        run: npm run pack:check
 
       - name: Test
         run: make test
@@ -41,4 +49,3 @@ jobs:
           version: v2.5.0
           install-mode: goinstall
           args: --timeout=5m
-

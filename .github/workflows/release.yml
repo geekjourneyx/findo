@@ -22,6 +22,11 @@ jobs:
           go-version-file: go.mod
           cache: true
 
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
       - name: Run release check
         run: make release-check
 
@@ -92,9 +97,104 @@ jobs:
           path: dist/findo_*.${{ matrix.archive }}
           if-no-files-found: error
 
+  smoke-npm:
+    name: Smoke npm installer
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          pattern: findo-*
+          merge-multiple: true
+
+      - name: Smoke npm package against release artifacts
+        run: |
+          set -euo pipefail
+          cd dist
+          sha256sum findo_* > SHA256SUMS
+          cd ..
+
+          pack_dir="$(mktemp -d)"
+          prefix_dir="$(mktemp -d)"
+
+          npm pack --pack-destination "$pack_dir" >/dev/null
+          tarball="$(find "$pack_dir" -maxdepth 1 -name '*.tgz' -print -quit)"
+          test -n "$tarball"
+
+          FINDO_RELEASE_BASE_URL="${GITHUB_WORKSPACE}/dist" \
+          npm install -g "$tarball" --prefix "$prefix_dir"
+
+          "$prefix_dir/bin/findo" version
+          "$prefix_dir/bin/findo" sources --json
+
+  smoke-npm-windows:
+    name: Smoke npm installer on Windows
+    needs: build
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          pattern: findo-*
+          merge-multiple: true
+
+      - name: Smoke npm package against release artifacts
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $distDir = Join-Path $env:GITHUB_WORKSPACE 'dist'
+          $packDir = Join-Path $env:RUNNER_TEMP 'findo-npm-pack'
+          $prefixDir = Join-Path $env:RUNNER_TEMP 'findo-npm-prefix'
+
+          Remove-Item -Force -Recurse $packDir, $prefixDir -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Force -Path $packDir, $prefixDir | Out-Null
+
+          Get-ChildItem $distDir -Filter 'findo_*' |
+            Sort-Object Name |
+            ForEach-Object {
+              $hash = (Get-FileHash -Algorithm SHA256 $_.FullName).Hash.ToLowerInvariant()
+              "$hash  $($_.Name)"
+            } | Set-Content -Encoding ascii (Join-Path $distDir 'SHA256SUMS')
+
+          npm pack --pack-destination $packDir | Out-Null
+          $tarball = Get-ChildItem $packDir -Filter *.tgz | Select-Object -First 1
+          if (-not $tarball) {
+            throw 'npm pack did not produce a tarball'
+          }
+
+          $env:FINDO_RELEASE_BASE_URL = $distDir
+          npm install -g $tarball.FullName --prefix $prefixDir
+
+          $packageRoot = npm root -g --prefix $prefixDir | Select-Object -Last 1
+          $packageDir = Join-Path $packageRoot '@geekjourneyx\findo'
+          node (Join-Path $packageDir 'scripts\run.js') version
+          node (Join-Path $packageDir 'scripts\run.js') sources --json
+
   publish:
     name: Publish GitHub release
-    needs: build
+    needs:
+      - build
+      - smoke-npm
+      - smoke-npm-windows
     runs-on: ubuntu-latest
     steps:
       - name: Download artifacts
@@ -118,3 +218,40 @@ jobs:
             dist/SHA256SUMS
           generate_release_notes: true
 
+  publish-npm:
+    name: Publish npm package
+    needs: publish
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check npm token
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          if [ -z "${NPM_TOKEN}" ]; then
+            echo "NPM_TOKEN is required to publish @geekjourneyx/findo" >&2
+            exit 1
+          fi
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Verify package version matches tag
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME#v}"
+          package_version="$(node -p "require('./package.json').version")"
+          if [ "$package_version" != "$version" ]; then
+            echo "package.json version ${package_version} does not match tag ${GITHUB_REF_NAME}" >&2
+            exit 1
+          fi
+
+      - name: Publish npm package
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish --access public
