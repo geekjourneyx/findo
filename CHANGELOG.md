@@ -1,10 +1,17 @@
 # Changelog
 
+## v1.2.3
+
+- Keep `skills/findo` as pure Agent Skill content and remove Go code from `skills/`.
+- Load bundled skill content through `internal/skillcontent` using the repository or npm package `skills/` directory.
+- Ship `skills/findo` in npm packages and GitHub Release archives, and smoke-test `findo skills read` from npm installs.
+- Simplify `skills/findo/SKILL.md` into a concise English Agent SOP.
+
 ## v1.2.2
 
 - Remove the duplicated internal Agent skill copy.
-- Embed directly from `skills/findo` through the `skills` package, keeping `skills/findo` as the single source of truth.
-- Update release checks to guard the single-source embed path instead of comparing mirrored files.
+- Move toward a single root Agent skill source after removing the mirrored internal copy.
+- Update release checks to guard against mirrored skill files.
 
 ## v1.2.1
 

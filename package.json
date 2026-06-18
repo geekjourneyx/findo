@@ -1,6 +1,6 @@
 {
   "name": "@geekjourneyx/findo",
-  "version": "1.2.2",
+  "version": "1.2.3",
   "description": "Install the findo CLI from the matching GitHub Release bundle.",
   "license": "MIT",
   "repository": {
@@ -21,6 +21,8 @@
   "files": [
     "scripts/install.js",
     "scripts/run.js",
+    "skills/findo/SKILL.md",
+    "skills/findo/test-prompts.json",
     "README.md",
     "CHANGELOG.md",
     "LICENSE"

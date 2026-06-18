@@ -1,10 +1,10 @@
-# Spec 01: Embedded Agent Skills
+# Spec 01: Bundled Agent Skills
 
 ## Goal
 
-Ship `findo v1.2.0` with a self-describing Agent SOP embedded in the release binary.
+Ship `findo v1.2.0` with a self-describing Agent SOP bundled with the CLI package.
 
-The problem is version drift: an agent may read an external skill, README, or repository checkout that does not match the executable on `PATH`. The binary must expose its own current instructions without network access or browser scraping.
+The problem is version drift: an agent may read an external skill, README, or repository checkout that does not match the executable on `PATH`. The installed CLI package must expose its own current instructions without network access or browser scraping.
 
 ## Commands
 
@@ -23,7 +23,7 @@ findo skills read findo SKILL.md --json
 - `skills read <name> --json` returns JSON with `version`, `skill`, `path`, `content`, and `guidance`.
 - Diagnostics go to stderr.
 - Unknown skills, missing paths, directories, and invalid relative paths return exit code `2`.
-- Embedded paths use slash-separated relative paths only.
+- Bundled paths use slash-separated relative paths only.
 - Absolute paths, `..`, and backslashes are rejected.
 
 ## JSON Shapes
@@ -51,7 +51,7 @@ findo skills read findo SKILL.md --json
   "skill": "findo",
   "path": "SKILL.md",
   "content": "---\nname: findo\n...",
-  "guidance": "Read this skill from the current findo binary with `findo skills read findo --json` so the SOP stays in sync with this CLI version."
+  "guidance": "Read this skill from the installed findo package with `findo skills read findo --json` so the SOP stays in sync with this CLI version."
 }
 ```
 
@@ -68,9 +68,9 @@ findo skills read findo SKILL.md --json
 
 Required coverage:
 
-- List embedded skills and parse frontmatter description.
+- List bundled skills and parse frontmatter description.
 - Read raw `SKILL.md`.
 - Read JSON-wrapped `SKILL.md`.
 - Reject unknown skills.
 - Reject path traversal and absolute paths.
-- Include the command in release checks so README and embedded SOP do not drift.
+- Include the command in release checks so README and bundled SOP do not drift.

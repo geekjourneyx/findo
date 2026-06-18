@@ -3,19 +3,24 @@ set -euo pipefail
 
 bash scripts/check-version.sh
 test -f package.json
-test -f skills/embed.go
 test -f skills/findo/SKILL.md
+test -f internal/skillcontent/source.go
 test -f docs/specs/v1.2.0/01-embedded-skills.md
 test -f scripts/install.js
 test -f scripts/run.js
+test -z "$(find skills -name '*.go' -print)"
 test "$(node -p "require('./package.json').name")" = "@geekjourneyx/findo"
 grep -q "findo" README.md
 grep -q "BOCHA_API_KEY" README.md
 grep -q "npm install -g @geekjourneyx/findo" README.md
+grep -q "npx skills add geekjourneyx/findo" README.md
 grep -q "findo skills list --json" README.md
 grep -q "findo skills read findo --json" README.md
-grep -q "findo skills read findo --json" skills/findo/SKILL.md
-grep -q "go:embed findo/\\*" skills/embed.go
+grep -q "findo bocha" skills/findo/SKILL.md
+grep -q "findo volc" skills/findo/SKILL.md
+grep -q "findo zhihu" skills/findo/SKILL.md
+grep -q "FINDO_SKILLS_DIR" scripts/run.js
+grep -q "skills/findo/SKILL.md" package.json
 grep -q "findo skills read findo --json" docs/specs/v1.2.0/01-embedded-skills.md
 grep -q "FINDO_RELEASE_BASE_URL" scripts/install.js
 grep -q "npm publish --access public" .github/workflows/release.yml

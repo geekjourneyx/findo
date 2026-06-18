@@ -27,7 +27,7 @@ The npm package installs the matching GitHub Release binary for your platform an
 Alternative Go install:
 
 ```bash
-go install github.com/geekjourneyx/findo/cmd/findo@v1.2.2
+go install github.com/geekjourneyx/findo/cmd/findo@v1.2.3
 ```
 
 Prebuilt binaries and checksums are available on the [GitHub Releases](https://github.com/geekjourneyx/findo/releases) page.
@@ -123,7 +123,7 @@ Recommended Agent Skills install:
 npx skills add geekjourneyx/findo
 ```
 
-Findo also embeds the same Agent SOP in the release binary so agents can read instructions that match the executable on `PATH`:
+Findo also ships the same Agent SOP with the CLI package so agents can read instructions that match the executable on `PATH`:
 
 ```bash
 findo skills list --json
@@ -139,7 +139,7 @@ Retrieval commands return a stable envelope. A successful JSON response looks li
 
 ```json
 {
-  "version": "1.2.2",
+  "version": "1.2.3",
   "query": {
     "text": "AI Agent 商业化",
     "mode": "search",

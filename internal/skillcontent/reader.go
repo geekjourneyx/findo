@@ -32,11 +32,11 @@ func New(fsys fs.FS) *Reader {
 
 func (r *Reader) List() ([]SkillInfo, error) {
 	if r == nil || r.fsys == nil {
-		return nil, fmt.Errorf("skill content not embedded in this build")
+		return nil, fmt.Errorf("skill content not available")
 	}
 	entries, err := fs.ReadDir(r.fsys, ".")
 	if err != nil {
-		return nil, fmt.Errorf("read embedded skills: %w", err)
+		return nil, fmt.Errorf("read skill content: %w", err)
 	}
 	skills := make([]SkillInfo, 0, len(entries))
 	for _, entry := range entries {
@@ -75,7 +75,7 @@ func (r *Reader) Read(name, relpath string) (ReadResult, error) {
 	}
 	data, err := fs.ReadFile(r.fsys, fullPath)
 	if err != nil {
-		return ReadResult{}, fmt.Errorf("read embedded skill file %q: %w", cleaned, err)
+		return ReadResult{}, fmt.Errorf("read skill file %q: %w", cleaned, err)
 	}
 	result := ReadResult{
 		Skill:   name,
@@ -83,7 +83,7 @@ func (r *Reader) Read(name, relpath string) (ReadResult, error) {
 		Content: string(data),
 	}
 	if cleaned == "SKILL.md" {
-		result.Guidance = fmt.Sprintf("Read this skill from the current findo binary with `findo skills read %s --json` so the SOP stays in sync with this CLI version.", name)
+		result.Guidance = fmt.Sprintf("Read this skill from the installed findo package with `findo skills read %s --json` so the SOP stays in sync with this CLI version.", name)
 	}
 	return result, nil
 }
@@ -95,7 +95,7 @@ func SplitTarget(arg string) (name, relpath string) {
 
 func (r *Reader) ensureSkill(name string) error {
 	if r == nil || r.fsys == nil {
-		return fmt.Errorf("skill content not embedded in this build")
+		return fmt.Errorf("skill content not available")
 	}
 	if name == "" || name == "." || name == ".." || strings.ContainsAny(name, `/\`) {
 		return unknownSkill(name)

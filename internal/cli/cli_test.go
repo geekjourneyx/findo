@@ -229,7 +229,7 @@ func TestSkillsReadJSON(t *testing.T) {
 		t.Fatalf("unexpected response: %#v", got)
 	}
 	if !strings.Contains(got.Content, "Agent Native Go CLI") {
-		t.Fatalf("content missing embedded skill: %.120q", got.Content)
+		t.Fatalf("content missing bundled skill: %.120q", got.Content)
 	}
 	if !strings.Contains(got.Guidance, "findo skills read findo --json") {
 		t.Fatalf("guidance = %q", got.Guidance)

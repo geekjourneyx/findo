@@ -84,6 +84,7 @@ jobs:
           mkdir -p "dist/${NAME}"
           go build -buildvcs=false -trimpath -ldflags="-s -w -X main.version=${VERSION}" -o "dist/${NAME}/findo${{ matrix.ext }}" ./cmd/findo
           cp README.md LICENSE CHANGELOG.md "dist/${NAME}/"
+          cp -R skills "dist/${NAME}/"
           if [ "${{ matrix.archive }}" = "zip" ]; then
             (cd dist && zip -r "${NAME}.zip" "${NAME}")
           else
@@ -136,6 +137,7 @@ jobs:
 
           "$prefix_dir/bin/findo" version
           "$prefix_dir/bin/findo" sources --json
+          "$prefix_dir/bin/findo" skills read findo --json
 
   smoke-npm-windows:
     name: Smoke npm installer on Windows
@@ -188,6 +190,7 @@ jobs:
           $packageDir = Join-Path $packageRoot '@geekjourneyx\findo'
           node (Join-Path $packageDir 'scripts\run.js') version
           node (Join-Path $packageDir 'scripts\run.js') sources --json
+          node (Join-Path $packageDir 'scripts\run.js') skills read findo --json
 
   publish:
     name: Publish GitHub release
