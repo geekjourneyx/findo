@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.2.1
+
+- Move embedded skill implementation under `internal/skillcontent` instead of exposing it from the module root.
+- Add release checks and tests to prevent drift between the root Agent skill and the embedded copy.
+
 ## v1.2.0
 
 - Embed the Findo Agent skill in the release binary.

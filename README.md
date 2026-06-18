@@ -27,7 +27,7 @@ The npm package installs the matching GitHub Release binary for your platform an
 Alternative Go install:
 
 ```bash
-go install github.com/geekjourneyx/findo/cmd/findo@v1.2.0
+go install github.com/geekjourneyx/findo/cmd/findo@v1.2.1
 ```
 
 Prebuilt binaries and checksums are available on the [GitHub Releases](https://github.com/geekjourneyx/findo/releases) page.
@@ -133,7 +133,7 @@ Retrieval commands return a stable envelope. A successful JSON response looks li
 
 ```json
 {
-  "version": "1.2.0",
+  "version": "1.2.1",
   "query": {
     "text": "AI Agent 商业化",
     "mode": "search",
