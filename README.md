@@ -117,7 +117,13 @@ Human output defaults to a table. Use `--json` for scripts, agents, CI, and down
 
 ## Agent Skill
 
-Findo embeds its Agent SOP in the release binary so agents can read instructions that match the executable on `PATH`:
+Recommended Agent Skills install:
+
+```bash
+npx skills add geekjourneyx/findo
+```
+
+Findo also embeds the same Agent SOP in the release binary so agents can read instructions that match the executable on `PATH`:
 
 ```bash
 findo skills list --json
@@ -125,7 +131,7 @@ findo skills read findo
 findo skills read findo --json
 ```
 
-`skills read` defaults to raw Markdown for direct agent context. With `--json`, the same content is returned in the `content` field with version metadata. Use this when an external skill install, README, or repository checkout may be older than the installed CLI.
+`skills read` defaults to raw Markdown for direct agent context. With `--json`, the same content is returned in the `content` field with version metadata. Use this when you need to verify the SOP bundled with the installed CLI.
 
 ## Output
 
