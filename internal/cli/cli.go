@@ -10,10 +10,12 @@ import (
 	"strings"
 	"time"
 
+	findo "github.com/geekjourneyx/findo"
 	"github.com/geekjourneyx/findo/internal/config"
 	"github.com/geekjourneyx/findo/internal/findoerr"
 	"github.com/geekjourneyx/findo/internal/output"
 	"github.com/geekjourneyx/findo/internal/search"
+	"github.com/geekjourneyx/findo/internal/skillcontent"
 	sourcepkg "github.com/geekjourneyx/findo/internal/source"
 	"github.com/geekjourneyx/findo/internal/source/bocha"
 	"github.com/geekjourneyx/findo/internal/source/volcengine"
@@ -107,6 +109,9 @@ func Run(args []string, version string, stdout, stderr io.Writer) int {
 		writeSourcesText(stdout)
 		return ExitOK
 	}
+	if p.Command == "skills" {
+		return runSkills(p, version, stdout, stderr)
+	}
 	if p.Command == "config" {
 		return runConfig(p, stdout, stderr)
 	}
@@ -180,6 +185,76 @@ func parse(args []string) (parsed, error) {
 		}
 	}
 	return p, nil
+}
+
+func runSkills(p parsed, version string, stdout, stderr io.Writer) int {
+	if err := validateSkills(p); err != nil {
+		_, _ = fmt.Fprintln(stderr, err.Error())
+		return ExitInvalidArgument
+	}
+	reader, err := newSkillReader()
+	if err != nil {
+		_, _ = fmt.Fprintln(stderr, err.Error())
+		return ExitInternal
+	}
+
+	action := p.Positionals[0]
+	switch action {
+	case "list":
+		skills, err := reader.List()
+		if err != nil {
+			_, _ = fmt.Fprintln(stderr, err.Error())
+			return ExitInternal
+		}
+		if err := output.WriteJSON(stdout, map[string]any{
+			"version": version,
+			"skills":  skills,
+			"count":   len(skills),
+		}); err != nil {
+			_, _ = fmt.Fprintln(stderr, err.Error())
+			return ExitInternal
+		}
+		return ExitOK
+	case "read":
+		name, relpath := skillcontent.SplitTarget(p.Positionals[1])
+		if len(p.Positionals) == 3 {
+			relpath = p.Positionals[2]
+		}
+		result, err := reader.Read(name, relpath)
+		if err != nil {
+			_, _ = fmt.Fprintln(stderr, err.Error())
+			return ExitInvalidArgument
+		}
+		if p.JSON {
+			if err := output.WriteJSON(stdout, map[string]any{
+				"version":  version,
+				"skill":    result.Skill,
+				"path":     result.Path,
+				"content":  result.Content,
+				"guidance": result.Guidance,
+			}); err != nil {
+				_, _ = fmt.Fprintln(stderr, err.Error())
+				return ExitInternal
+			}
+			return ExitOK
+		}
+		if _, err := io.WriteString(stdout, result.Content); err != nil {
+			_, _ = fmt.Fprintln(stderr, err.Error())
+			return ExitInternal
+		}
+		return ExitOK
+	default:
+		_, _ = fmt.Fprintf(stderr, "unknown skills command: %s\n", action)
+		return ExitInvalidArgument
+	}
+}
+
+func newSkillReader() (*skillcontent.Reader, error) {
+	fsys, err := findo.EmbeddedSkills()
+	if err != nil {
+		return nil, fmt.Errorf("skill content not embedded in this build: %w", err)
+	}
+	return skillcontent.New(fsys), nil
 }
 
 func runConfig(p parsed, stdout, stderr io.Writer) int {
@@ -486,6 +561,34 @@ func validateSources(p parsed) error {
 	}
 	if len(p.Positionals) > 0 {
 		return fmt.Errorf("unexpected argument for findo sources: %s", p.Positionals[0])
+	}
+	return nil
+}
+
+func validateSkills(p parsed) error {
+	if err := rejectUnknownFlags(p); err != nil {
+		return err
+	}
+	if len(p.Positionals) == 0 {
+		return fmt.Errorf("usage: findo skills <list|read>")
+	}
+	switch p.Positionals[0] {
+	case "list":
+		if p.Markdown || p.Table || p.Raw {
+			return fmt.Errorf("only --json is valid for findo skills list")
+		}
+		if len(p.Positionals) != 1 {
+			return fmt.Errorf("findo skills list takes no arguments")
+		}
+	case "read":
+		if p.Markdown || p.Table || p.Raw {
+			return fmt.Errorf("only --json is valid for findo skills read")
+		}
+		if len(p.Positionals) < 2 || len(p.Positionals) > 3 {
+			return fmt.Errorf("usage: findo skills read <name>[/<path>] [path]")
+		}
+	default:
+		return nil
 	}
 	return nil
 }

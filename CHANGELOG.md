@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.2.0
+
+- Embed the Findo Agent skill in the release binary.
+- Add `findo skills list/read` so agents can discover and read the current-version SOP without relying on stale external docs.
+- Extend release checks to guard embedded skill documentation and version consistency.
+
 ## v1.1.0
 
 - Add default config initialization, path discovery, and redacted config inspection.

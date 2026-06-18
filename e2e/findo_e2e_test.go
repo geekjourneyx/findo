@@ -24,7 +24,8 @@ func TestFindoBinaryVersionAndSources(t *testing.T) {
 	if err != nil {
 		t.Fatalf("version failed: %v\n%s", err, out)
 	}
-	if strings.TrimSpace(string(out)) != "findo 1.0.0" {
+	wantVersion := "findo " + makefileVersion(t)
+	if strings.TrimSpace(string(out)) != wantVersion {
 		t.Fatalf("version output = %q", out)
 	}
 
@@ -39,4 +40,19 @@ func TestFindoBinaryVersionAndSources(t *testing.T) {
 			t.Fatalf("sources output missing %s: %s", source, out)
 		}
 	}
+}
+
+func makefileVersion(t *testing.T) string {
+	t.Helper()
+	data, err := os.ReadFile("../Makefile")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, line := range strings.Split(string(data), "\n") {
+		if strings.HasPrefix(line, "VERSION ?= ") {
+			return strings.TrimSpace(strings.TrimPrefix(line, "VERSION ?= "))
+		}
+	}
+	t.Fatal("Makefile VERSION is missing")
+	return ""
 }

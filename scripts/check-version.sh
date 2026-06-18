@@ -36,6 +36,10 @@ makefile_version="$(awk '/^VERSION[[:space:]]*\?=/{print $3; exit}' Makefile)"
 [[ -n "$makefile_version" ]] || fail "Makefile VERSION is missing"
 [[ "$makefile_version" == "$expected" ]] || fail "Makefile VERSION is $makefile_version, expected $expected"
 
+main_version="$(awk -F\" '/var version = /{print $2; exit}' cmd/findo/main.go)"
+[[ -n "$main_version" ]] || fail "cmd/findo/main.go version is missing"
+[[ "$main_version" == "$expected" ]] || fail "cmd/findo/main.go version is $main_version, expected $expected"
+
 changelog_version="$(awk '/^## /{print $2; exit}' CHANGELOG.md)"
 [[ -n "$changelog_version" ]] || fail "CHANGELOG.md has no version heading"
 changelog_version="$(normalize_version "$changelog_version")"

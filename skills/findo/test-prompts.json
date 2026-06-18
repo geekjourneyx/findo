@@ -1,0 +1,17 @@
+[
+  {
+    "id": 1,
+    "prompt": "搜一下知乎，帮我找 10 个反直觉、颠覆认知的程序员话题，看看热门回答都在说什么。",
+    "expected": "Uses findo zhihu or findo zhihu web with JSON output, summarizes topic candidates with sources, and separates evidence from inference."
+  },
+  {
+    "id": 2,
+    "prompt": "帮我检查当前 findo 是否已经配置好，分别用最小 limit 测一下知乎、Bocha 和火山引擎能不能正常返回，但不要读取或输出任何密钥。",
+    "expected": "Checks version and redacted config, runs minimal provider smoke calls with --limit 1, reports provider statuses, and avoids reading or exposing secrets."
+  },
+  {
+    "id": 3,
+    "prompt": "我想调研一个中文互联网话题，先用 Bocha 查全网，再用火山引擎给一个直答，最后告诉我哪些结论不确定。",
+    "expected": "Runs narrow Bocha and Volcengine queries with --json, cross-checks claims, reports URLs and uncertainty, and preserves provider failures if any."
+  }
+]

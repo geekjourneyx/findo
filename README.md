@@ -27,7 +27,7 @@ The npm package installs the matching GitHub Release binary for your platform an
 Alternative Go install:
 
 ```bash
-go install github.com/geekjourneyx/findo/cmd/findo@v1.0.0
+go install github.com/geekjourneyx/findo/cmd/findo@v1.2.0
 ```
 
 Prebuilt binaries and checksums are available on the [GitHub Releases](https://github.com/geekjourneyx/findo/releases) page.
@@ -103,6 +103,8 @@ make release-check
 ```bash
 findo version
 findo sources --json
+findo skills list --json
+findo skills read findo --json
 
 BOCHA_API_KEY=... findo bocha "AI Agent 商业化" --json
 ARK_API_KEY=... findo volc "瑞幸咖啡 2026 门店数是否可信" --json
@@ -113,13 +115,25 @@ ZHIHU_ACCESS_SECRET=... findo hot zhihu --json
 
 Human output defaults to a table. Use `--json` for scripts, agents, CI, and downstream tools.
 
+## Agent Skill
+
+Findo embeds its Agent SOP in the release binary so agents can read instructions that match the executable on `PATH`:
+
+```bash
+findo skills list --json
+findo skills read findo
+findo skills read findo --json
+```
+
+`skills read` defaults to raw Markdown for direct agent context. With `--json`, the same content is returned in the `content` field with version metadata. Use this when an external skill install, README, or repository checkout may be older than the installed CLI.
+
 ## Output
 
 Retrieval commands return a stable envelope. A successful JSON response looks like this:
 
 ```json
 {
-  "version": "1.0.0",
+  "version": "1.2.0",
   "query": {
     "text": "AI Agent 商业化",
     "mode": "search",

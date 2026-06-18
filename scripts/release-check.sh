@@ -3,12 +3,18 @@ set -euo pipefail
 
 bash scripts/check-version.sh
 test -f package.json
+test -f skills/findo/SKILL.md
+test -f docs/specs/v1.2.0/01-embedded-skills.md
 test -f scripts/install.js
 test -f scripts/run.js
 test "$(node -p "require('./package.json').name")" = "@geekjourneyx/findo"
 grep -q "findo" README.md
 grep -q "BOCHA_API_KEY" README.md
 grep -q "npm install -g @geekjourneyx/findo" README.md
+grep -q "findo skills list --json" README.md
+grep -q "findo skills read findo --json" README.md
+grep -q "findo skills read findo --json" skills/findo/SKILL.md
+grep -q "findo skills read findo --json" docs/specs/v1.2.0/01-embedded-skills.md
 grep -q "FINDO_RELEASE_BASE_URL" scripts/install.js
 grep -q "npm publish --access public" .github/workflows/release.yml
 grep -q "NPM_TOKEN" .github/workflows/release.yml

@@ -2,6 +2,7 @@ package cli
 
 import (
 	"bytes"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -151,6 +152,107 @@ func TestSourcesJSON(t *testing.T) {
 	}
 	if got := stderr.String(); got != "" {
 		t.Fatalf("stderr = %q, want empty", got)
+	}
+}
+
+func TestSkillsListJSON(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	code := Run([]string{"skills", "list", "--json"}, "1.2.0", &stdout, &stderr)
+
+	if code != ExitOK {
+		t.Fatalf("exit code = %d, want %d; stderr=%q", code, ExitOK, stderr.String())
+	}
+	var got struct {
+		Version string `json:"version"`
+		Count   int    `json:"count"`
+		Skills  []struct {
+			Name        string `json:"name"`
+			Description string `json:"description"`
+		} `json:"skills"`
+	}
+	if err := json.Unmarshal(stdout.Bytes(), &got); err != nil {
+		t.Fatalf("unmarshal stdout: %v\n%s", err, stdout.String())
+	}
+	if got.Version != "1.2.0" || got.Count != 1 {
+		t.Fatalf("unexpected response: %#v", got)
+	}
+	if got.Skills[0].Name != "findo" || !strings.Contains(got.Skills[0].Description, "Chinese internet research") {
+		t.Fatalf("unexpected skill: %#v", got.Skills[0])
+	}
+	if got := stderr.String(); got != "" {
+		t.Fatalf("stderr = %q, want empty", got)
+	}
+}
+
+func TestSkillsReadRaw(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	code := Run([]string{"skills", "read", "findo"}, "1.2.0", &stdout, &stderr)
+
+	if code != ExitOK {
+		t.Fatalf("exit code = %d, want %d; stderr=%q", code, ExitOK, stderr.String())
+	}
+	if !strings.HasPrefix(stdout.String(), "---\nname: findo") {
+		t.Fatalf("stdout = %q", stdout.String())
+	}
+	if strings.Contains(stdout.String(), `"content"`) {
+		t.Fatalf("raw output must not be JSON wrapped: %s", stdout.String())
+	}
+	if got := stderr.String(); got != "" {
+		t.Fatalf("stderr = %q, want empty", got)
+	}
+}
+
+func TestSkillsReadJSON(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	code := Run([]string{"skills", "read", "findo", "--json"}, "1.2.0", &stdout, &stderr)
+
+	if code != ExitOK {
+		t.Fatalf("exit code = %d, want %d; stderr=%q", code, ExitOK, stderr.String())
+	}
+	var got struct {
+		Version  string `json:"version"`
+		Skill    string `json:"skill"`
+		Path     string `json:"path"`
+		Content  string `json:"content"`
+		Guidance string `json:"guidance"`
+	}
+	if err := json.Unmarshal(stdout.Bytes(), &got); err != nil {
+		t.Fatalf("unmarshal stdout: %v\n%s", err, stdout.String())
+	}
+	if got.Version != "1.2.0" || got.Skill != "findo" || got.Path != "SKILL.md" {
+		t.Fatalf("unexpected response: %#v", got)
+	}
+	if !strings.Contains(got.Content, "Agent Native Go CLI") {
+		t.Fatalf("content missing embedded skill: %.120q", got.Content)
+	}
+	if !strings.Contains(got.Guidance, "findo skills read findo --json") {
+		t.Fatalf("guidance = %q", got.Guidance)
+	}
+	if got := stderr.String(); got != "" {
+		t.Fatalf("stderr = %q, want empty", got)
+	}
+}
+
+func TestSkillsReadRejectsTraversal(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	code := Run([]string{"skills", "read", "findo", "../../etc/passwd"}, "1.2.0", &stdout, &stderr)
+
+	if code != ExitInvalidArgument {
+		t.Fatalf("exit code = %d, want %d", code, ExitInvalidArgument)
+	}
+	if !strings.Contains(stderr.String(), "invalid path") {
+		t.Fatalf("stderr = %q", stderr.String())
+	}
+	if got := stdout.String(); got != "" {
+		t.Fatalf("stdout = %q, want empty", got)
 	}
 }
 

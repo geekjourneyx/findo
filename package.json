@@ -1,6 +1,6 @@
 {
   "name": "@geekjourneyx/findo",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Install the findo CLI from the matching GitHub Release bundle.",
   "license": "MIT",
   "repository": {
