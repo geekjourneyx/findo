@@ -2,6 +2,8 @@ package cli
 
 import (
 	"bytes"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -152,6 +154,213 @@ func TestSourcesJSON(t *testing.T) {
 	}
 }
 
+func TestConfigPath(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", dir)
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	code := Run([]string{"config", "path"}, "1.0.0", &stdout, &stderr)
+
+	if code != ExitOK {
+		t.Fatalf("exit code = %d, want %d; stderr=%q", code, ExitOK, stderr.String())
+	}
+	want := filepath.Join(dir, "findo", "config.yaml") + "\n"
+	if got := stdout.String(); got != want {
+		t.Fatalf("stdout = %q, want %q", got, want)
+	}
+	if got := stderr.String(); got != "" {
+		t.Fatalf("stderr = %q, want empty", got)
+	}
+}
+
+func TestConfigInitCreatesDefaultConfig(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "findo.yaml")
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	code := Run([]string{"config", "init", "--path", path}, "1.0.0", &stdout, &stderr)
+
+	if code != ExitOK {
+		t.Fatalf("exit code = %d, want %d; stderr=%q", code, ExitOK, stderr.String())
+	}
+	if !strings.Contains(stdout.String(), "created config: "+path) {
+		t.Fatalf("stdout = %q", stdout.String())
+	}
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := info.Mode().Perm(); got != 0600 {
+		t.Fatalf("mode = %v, want 0600", got)
+	}
+	b, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(b), `api_key: ""`) {
+		t.Fatalf("config should contain empty API key fields:\n%s", string(b))
+	}
+	if got := stderr.String(); got != "" {
+		t.Fatalf("stderr = %q, want empty", got)
+	}
+}
+
+func TestConfigInitDoesNotOverwriteWithoutForce(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "findo.yaml")
+	if err := os.WriteFile(path, []byte("existing"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	code := Run([]string{"config", "init", "--path", path}, "1.0.0", &stdout, &stderr)
+
+	if code != ExitConfig {
+		t.Fatalf("exit code = %d, want %d", code, ExitConfig)
+	}
+	if !strings.Contains(stderr.String(), "config already exists") {
+		t.Fatalf("stderr = %q", stderr.String())
+	}
+	if got := stdout.String(); got != "" {
+		t.Fatalf("stdout = %q, want empty", got)
+	}
+}
+
+func TestConfigInitForceOverwrites(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "findo.yaml")
+	if err := os.WriteFile(path, []byte("existing"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	code := Run([]string{"config", "init", "--path", path, "--force"}, "1.0.0", &stdout, &stderr)
+
+	if code != ExitOK {
+		t.Fatalf("exit code = %d, want %d; stderr=%q", code, ExitOK, stderr.String())
+	}
+	b, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(b) == "existing" {
+		t.Fatalf("config was not overwritten")
+	}
+}
+
+func TestConfigShowJSONRedactsSecrets(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "findo.yaml")
+	err := os.WriteFile(path, []byte(`
+bocha:
+  api_key: bocha-secret
+volcengine:
+  api_key: ark-secret
+zhihu:
+  access_secret: zhihu-secret
+`), 0600)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	code := Run([]string{"config", "show", "--config", path, "--json"}, "1.0.0", &stdout, &stderr)
+
+	if code != ExitOK {
+		t.Fatalf("exit code = %d, want %d; stderr=%q", code, ExitOK, stderr.String())
+	}
+	out := stdout.String()
+	for _, secret := range []string{"bocha-secret", "ark-secret", "zhihu-secret"} {
+		if strings.Contains(out, secret) {
+			t.Fatalf("stdout leaked secret %q: %s", secret, out)
+		}
+	}
+	if got := strings.Count(out, `"***"`); got != 3 {
+		t.Fatalf("redaction count = %d, want 3 in %s", got, out)
+	}
+	if got := stderr.String(); got != "" {
+		t.Fatalf("stderr = %q, want empty", got)
+	}
+}
+
+func TestConfigShowJSONRedactsEnvSecrets(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	t.Setenv("BOCHA_API_KEY", "bocha-env-secret")
+	t.Setenv("ARK_API_KEY", "ark-env-secret")
+	t.Setenv("ZHIHU_ACCESS_SECRET", "zhihu-env-secret")
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	code := Run([]string{"config", "show", "--json"}, "1.0.0", &stdout, &stderr)
+
+	if code != ExitOK {
+		t.Fatalf("exit code = %d, want %d; stderr=%q", code, ExitOK, stderr.String())
+	}
+	out := stdout.String()
+	for _, secret := range []string{"bocha-env-secret", "ark-env-secret", "zhihu-env-secret"} {
+		if strings.Contains(out, secret) {
+			t.Fatalf("stdout leaked secret %q: %s", secret, out)
+		}
+	}
+	if got := strings.Count(out, `"***"`); got != 3 {
+		t.Fatalf("redaction count = %d, want 3 in %s", got, out)
+	}
+}
+
+func TestConfigShowRequiresJSON(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	code := Run([]string{"config", "show"}, "1.0.0", &stdout, &stderr)
+
+	if code != ExitInvalidArgument {
+		t.Fatalf("exit code = %d, want %d", code, ExitInvalidArgument)
+	}
+	if !strings.Contains(stderr.String(), "only --json is valid") {
+		t.Fatalf("stderr = %q", stderr.String())
+	}
+}
+
+func TestRetrievalReadsDefaultConfigPath(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", dir)
+	path := filepath.Join(dir, "findo", "config.yaml")
+	if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte("search:\n  limit: 99\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	code := Run([]string{"bocha", "query"}, "1.0.0", &stdout, &stderr)
+
+	if code != ExitConfig {
+		t.Fatalf("exit code = %d, want %d", code, ExitConfig)
+	}
+	if !strings.Contains(stderr.String(), "search.limit must be 1..50") {
+		t.Fatalf("stderr = %q", stderr.String())
+	}
+}
+
+func TestPathAndForceRejectedOutsideConfigInit(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	code := Run([]string{"bocha", "query", "--path", "findo.yaml"}, "1.0.0", &stdout, &stderr)
+
+	if code != ExitInvalidArgument {
+		t.Fatalf("exit code = %d, want %d", code, ExitInvalidArgument)
+	}
+	if !strings.Contains(stderr.String(), "only valid for findo config init") {
+		t.Fatalf("stderr = %q", stderr.String())
+	}
+}
+
 func TestNoStdinQuerySupport(t *testing.T) {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
@@ -172,6 +381,7 @@ func TestNoStdinQuerySupport(t *testing.T) {
 func TestExplicitSourceMissingCredentialExitsCredential(t *testing.T) {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 	t.Setenv("BOCHA_API_KEY", "")
 
 	code := Run([]string{"bocha", "query", "--json"}, "1.0.0", &stdout, &stderr)

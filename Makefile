@@ -1,7 +1,7 @@
-VERSION ?= 1.0.0
+VERSION ?= 1.1.0
 LDFLAGS := -s -w -X main.version=$(VERSION)
 
-.PHONY: build test lint release-check smoke-bocha smoke-volcengine smoke-zhihu
+.PHONY: build test lint version-check release-check smoke-bocha smoke-volcengine smoke-zhihu
 
 build:
 	go build -buildvcs=false -trimpath -ldflags="$(LDFLAGS)" -o findo ./cmd/findo
@@ -14,8 +14,11 @@ lint:
 	GOFLAGS="-buildvcs=false" go vet ./...
 	GOFLAGS="-buildvcs=false" go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.5.0 run
 
+version-check:
+	VERSION=$(VERSION) bash scripts/check-version.sh
+
 release-check:
-	bash scripts/release-check.sh
+	VERSION=$(VERSION) bash scripts/release-check.sh
 
 smoke-bocha:
 	BOCHA_API_KEY=$${BOCHA_API_KEY} go run ./cmd/findo bocha "瑞幸咖啡 2026 门店数" --json

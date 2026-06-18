@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -43,6 +44,8 @@ type parsed struct {
 	Limit        int
 	LimitSet     bool
 	ConfigPath   string
+	Path         string
+	Force        bool
 	UnknownFlags []string
 }
 
@@ -66,6 +69,10 @@ func Run(args []string, version string, stdout, stderr io.Writer) int {
 	}
 	if p.LimitSet && (p.Limit <= 0 || p.Limit > 50) {
 		_, _ = fmt.Fprintln(stderr, "--limit must be 1..50")
+		return ExitInvalidArgument
+	}
+	if (p.Path != "" || p.Force) && !isConfigInitCommand(p) {
+		_, _ = fmt.Fprintln(stderr, "--path and --force are only valid for findo config init")
 		return ExitInvalidArgument
 	}
 	if len(args) == 0 || p.Command == "help" {
@@ -99,6 +106,9 @@ func Run(args []string, version string, stdout, stderr io.Writer) int {
 		}
 		writeSourcesText(stdout)
 		return ExitOK
+	}
+	if p.Command == "config" {
+		return runConfig(p, stdout, stderr)
 	}
 	if isRetrievalCommand(p) {
 		return runRetrieval(p, version, stdout, stderr)
@@ -149,6 +159,14 @@ func parse(args []string) (parsed, error) {
 			}
 			p.ConfigPath = args[i+1]
 			i++
+		case "--path":
+			if i+1 >= len(args) {
+				return p, fmt.Errorf("--path requires a value")
+			}
+			p.Path = args[i+1]
+			i++
+		case "--force":
+			p.Force = true
 		default:
 			if len(args[i]) > 0 && args[i][0] == '-' {
 				p.UnknownFlags = append(p.UnknownFlags, args[i])
@@ -162,6 +180,50 @@ func parse(args []string) (parsed, error) {
 		}
 	}
 	return p, nil
+}
+
+func runConfig(p parsed, stdout, stderr io.Writer) int {
+	if err := validateConfig(p); err != nil {
+		_, _ = fmt.Fprintln(stderr, err.Error())
+		return ExitInvalidArgument
+	}
+	action := p.Positionals[0]
+	switch action {
+	case "init":
+		path, err := config.Init(p.Path, p.Force)
+		if err != nil {
+			if errors.Is(err, os.ErrExist) {
+				_, _ = fmt.Fprintln(stderr, "config already exists; use --force to overwrite")
+				return ExitConfig
+			}
+			_, _ = fmt.Fprintln(stderr, err.Error())
+			return ExitConfig
+		}
+		_, _ = fmt.Fprintf(stdout, "created config: %s\n", path)
+		return ExitOK
+	case "path":
+		path, err := config.DefaultPath()
+		if err != nil {
+			_, _ = fmt.Fprintln(stderr, err.Error())
+			return ExitConfig
+		}
+		_, _ = fmt.Fprintln(stdout, path)
+		return ExitOK
+	case "show":
+		cfg, err := config.Load(config.Options{Path: p.ConfigPath})
+		if err != nil {
+			_, _ = fmt.Fprintln(stderr, err.Error())
+			return ExitConfig
+		}
+		if err := output.WriteJSON(stdout, cfg.Redacted()); err != nil {
+			_, _ = fmt.Fprintln(stderr, err.Error())
+			return ExitInternal
+		}
+		return ExitOK
+	default:
+		_, _ = fmt.Fprintf(stderr, "unknown config command: %s\n", action)
+		return ExitInvalidArgument
+	}
 }
 
 func runRetrieval(p parsed, version string, stdout, stderr io.Writer) int {
@@ -428,6 +490,47 @@ func validateSources(p parsed) error {
 	return nil
 }
 
+func validateConfig(p parsed) error {
+	if err := rejectUnknownFlags(p); err != nil {
+		return err
+	}
+	if len(p.Positionals) == 0 {
+		return fmt.Errorf("usage: findo config <init|path|show>")
+	}
+	if len(p.Positionals) > 1 {
+		return fmt.Errorf("unexpected argument for findo config %s: %s", p.Positionals[0], p.Positionals[1])
+	}
+	switch p.Positionals[0] {
+	case "init":
+		if p.JSON || p.Markdown || p.Table || p.Raw {
+			return fmt.Errorf("output flags are not valid for findo config init")
+		}
+		if p.ConfigPath != "" {
+			return fmt.Errorf("--config is not valid for findo config init; use --path")
+		}
+	case "path":
+		if p.JSON || p.Markdown || p.Table || p.Raw {
+			return fmt.Errorf("output flags are not valid for findo config path")
+		}
+		if p.Path != "" || p.Force || p.ConfigPath != "" {
+			return fmt.Errorf("flags are not valid for findo config path")
+		}
+	case "show":
+		if !p.JSON {
+			return fmt.Errorf("only --json is valid for findo config show")
+		}
+		if p.Markdown || p.Table || p.Raw {
+			return fmt.Errorf("only --json is valid for findo config show")
+		}
+		if p.Path != "" || p.Force {
+			return fmt.Errorf("--path and --force are not valid for findo config show")
+		}
+	default:
+		return nil
+	}
+	return nil
+}
+
 func rejectUnknownFlags(p parsed) error {
 	if len(p.UnknownFlags) > 0 {
 		return fmt.Errorf("unknown flag: %s", p.UnknownFlags[0])
@@ -455,6 +558,10 @@ func isRetrievalCommand(p parsed) bool {
 	default:
 		return false
 	}
+}
+
+func isConfigInitCommand(p parsed) bool {
+	return p.Command == "config" && len(p.Positionals) > 0 && p.Positionals[0] == "init"
 }
 
 func isZhihuWebCommand(args []string) bool {

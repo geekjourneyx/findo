@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.1.0
+
+- Add default config initialization, path discovery, and redacted config inspection.
+
 ## v1.0.0
 
 - Initial stable CLI contract.

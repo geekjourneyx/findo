@@ -1,13 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-test "${VERSION:-1.0.0}" = "1.0.0"
+bash scripts/check-version.sh
 test -f package.json
 test -f scripts/install.js
 test -f scripts/run.js
-test "$(node -p "require('./package.json').version")" = "${VERSION:-1.0.0}"
 test "$(node -p "require('./package.json').name")" = "@geekjourneyx/findo"
-grep -q "v1.0.0" CHANGELOG.md
 grep -q "findo" README.md
 grep -q "BOCHA_API_KEY" README.md
 grep -q "npm install -g @geekjourneyx/findo" README.md

@@ -3,13 +3,15 @@ package config
 import (
 	"errors"
 	"os"
+	"path/filepath"
 
 	"gopkg.in/yaml.v3"
 )
 
 type Options struct {
-	Path       string
-	DisableEnv bool
+	Path               string
+	DisableEnv         bool
+	DisableDefaultPath bool
 }
 
 type Config struct {
@@ -83,10 +85,29 @@ func Defaults() Config {
 	}
 }
 
+func DefaultPath() (string, error) {
+	dir, err := os.UserConfigDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(dir, "findo", "config.yaml"), nil
+}
+
 func Load(opts Options) (Config, error) {
 	cfg := Defaults()
-	if opts.Path != "" {
-		b, err := os.ReadFile(opts.Path)
+	path := opts.Path
+	if path == "" && !opts.DisableDefaultPath {
+		defaultPath, err := DefaultPath()
+		if err == nil {
+			if _, err := os.Stat(defaultPath); err == nil {
+				path = defaultPath
+			} else if !errors.Is(err, os.ErrNotExist) {
+				return cfg, err
+			}
+		}
+	}
+	if path != "" {
+		b, err := os.ReadFile(path)
 		if err != nil {
 			return cfg, err
 		}
@@ -101,6 +122,77 @@ func Load(opts Options) (Config, error) {
 		return cfg, errors.New("search.limit must be 1..50")
 	}
 	return cfg, nil
+}
+
+func Init(path string, force bool) (string, error) {
+	if path == "" {
+		defaultPath, err := DefaultPath()
+		if err != nil {
+			return "", err
+		}
+		path = defaultPath
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
+		return "", err
+	}
+	if !force {
+		file, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
+		if err != nil {
+			if errors.Is(err, os.ErrExist) {
+				return "", os.ErrExist
+			}
+			return "", err
+		}
+		if _, err := file.WriteString(DefaultYAML()); err != nil {
+			_ = file.Close()
+			return "", err
+		}
+		if err := file.Close(); err != nil {
+			return "", err
+		}
+		return path, nil
+	}
+	if err := os.WriteFile(path, []byte(DefaultYAML()), 0600); err != nil {
+		return "", err
+	}
+	if err := os.Chmod(path, 0600); err != nil {
+		return "", err
+	}
+	return path, nil
+}
+
+func DefaultYAML() string {
+	return `search:
+  default_source_ids:
+    - bocha_web
+    - volcengine_answer
+    - zhihu_search
+  limit: 10
+  timeout: 45s
+  output: table
+  language: zh-CN
+
+bocha:
+  enabled: true
+  api_key: ""
+  endpoint: https://api.bocha.cn/v1/web-search
+
+volcengine:
+  enabled: true
+  api_key: ""
+  model: doubao-seed-2-0-lite-260215
+  endpoint: https://ark.cn-beijing.volces.com/api/v3/responses
+
+zhihu:
+  enabled: true
+  access_secret: ""
+  endpoint_base: https://developer.zhihu.com/api/v1/content
+
+output:
+  show_source: true
+  show_url: true
+  show_published_at: true
+`
 }
 
 func applyEnv(cfg *Config) {

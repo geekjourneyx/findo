@@ -41,7 +41,22 @@ make build
 
 ## Configure
 
-Set the credentials for the providers you want to use:
+Initialize the default config file:
+
+```bash
+findo config init
+findo config path
+```
+
+This creates a config file at the platform default path. On Linux this is typically:
+
+```text
+~/.config/findo/config.yaml
+```
+
+Run `findo config path` for the exact path on your machine.
+
+Edit that file and set the credentials for the providers you want to use:
 
 | Provider | Environment variables |
 | --- | --- |
@@ -49,12 +64,39 @@ Set the credentials for the providers you want to use:
 | Volcengine Ark | `ARK_API_KEY` or `VOLCENGINE_API_KEY` |
 | Zhihu | `ZHIHU_ACCESS_SECRET` or `ZHIHU_API_KEY` |
 
+The config file uses the same provider fields:
+
+```yaml
+bocha:
+  api_key: ""
+
+volcengine:
+  api_key: ""
+  model: doubao-seed-2-0-lite-260215
+
+zhihu:
+  access_secret: ""
+```
+
 Configuration precedence is:
 
 1. CLI flags
 2. Environment variables
-3. Config file
+3. `--config` file or `~/.config/findo/config.yaml`
 4. Built-in defaults
+
+Inspect the merged config without leaking secrets:
+
+```bash
+findo config show --json
+```
+
+Before publishing a release, verify version alignment across `package.json`, `Makefile`, `CHANGELOG.md`, and the release tag:
+
+```bash
+make version-check
+make release-check
+```
 
 ## Quick Start
 
