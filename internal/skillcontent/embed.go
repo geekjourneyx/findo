@@ -1,4 +1,4 @@
-package findo
+package skillcontent
 
 import (
 	"embed"

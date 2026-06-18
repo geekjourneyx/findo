@@ -4,6 +4,7 @@ set -euo pipefail
 bash scripts/check-version.sh
 test -f package.json
 test -f skills/findo/SKILL.md
+test -f internal/skillcontent/skills/findo/SKILL.md
 test -f docs/specs/v1.2.0/01-embedded-skills.md
 test -f scripts/install.js
 test -f scripts/run.js
@@ -14,6 +15,8 @@ grep -q "npm install -g @geekjourneyx/findo" README.md
 grep -q "findo skills list --json" README.md
 grep -q "findo skills read findo --json" README.md
 grep -q "findo skills read findo --json" skills/findo/SKILL.md
+cmp -s skills/findo/SKILL.md internal/skillcontent/skills/findo/SKILL.md
+cmp -s skills/findo/test-prompts.json internal/skillcontent/skills/findo/test-prompts.json
 grep -q "findo skills read findo --json" docs/specs/v1.2.0/01-embedded-skills.md
 grep -q "FINDO_RELEASE_BASE_URL" scripts/install.js
 grep -q "npm publish --access public" .github/workflows/release.yml

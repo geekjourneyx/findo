@@ -10,7 +10,6 @@ import (
 	"strings"
 	"time"
 
-	findo "github.com/geekjourneyx/findo"
 	"github.com/geekjourneyx/findo/internal/config"
 	"github.com/geekjourneyx/findo/internal/findoerr"
 	"github.com/geekjourneyx/findo/internal/output"
@@ -250,7 +249,7 @@ func runSkills(p parsed, version string, stdout, stderr io.Writer) int {
 }
 
 func newSkillReader() (*skillcontent.Reader, error) {
-	fsys, err := findo.EmbeddedSkills()
+	fsys, err := skillcontent.EmbeddedSkills()
 	if err != nil {
 		return nil, fmt.Errorf("skill content not embedded in this build: %w", err)
 	}

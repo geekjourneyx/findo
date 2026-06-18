@@ -1,6 +1,7 @@
 package skillcontent
 
 import (
+	"os"
 	"strings"
 	"testing"
 	"testing/fstest"
@@ -67,5 +68,31 @@ func TestReadRejectsTraversal(t *testing.T) {
 				t.Fatalf("error = %v", err)
 			}
 		})
+	}
+}
+
+func TestEmbeddedSkillMatchesRootSkill(t *testing.T) {
+	rootSkill, err := os.ReadFile("../../skills/findo/SKILL.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	embeddedSkill, err := os.ReadFile("skills/findo/SKILL.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(embeddedSkill) != string(rootSkill) {
+		t.Fatal("internal embedded skill copy must match root skills/findo/SKILL.md")
+	}
+
+	rootPrompts, err := os.ReadFile("../../skills/findo/test-prompts.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	embeddedPrompts, err := os.ReadFile("skills/findo/test-prompts.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(embeddedPrompts) != string(rootPrompts) {
+		t.Fatal("internal embedded test prompts copy must match root skills/findo/test-prompts.json")
 	}
 }
