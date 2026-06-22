@@ -2,9 +2,9 @@
 
 # Tanso
 
-**探索中文互联网的 AI Search CLI.**
+**Search Chinese web sources from one Go CLI.**
 
-<img src="assets/banner.webp" alt="Tanso - 探索中文互联网的 AI Search CLI" width="100%">
+<img src="assets/banner.webp" alt="Tanso - Chinese web sources from one Go CLI" width="100%">
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
 [![Go](https://img.shields.io/badge/Go-1.23+-00ADD8.svg)](./go.mod)
