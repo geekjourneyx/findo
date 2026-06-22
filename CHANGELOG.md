@@ -1,5 +1,11 @@
 # Changelog
 
+## v2.0.1
+
+- Use a stable default config path across platforms: `~/.config/tanso/config.yaml`.
+- Support `TANSO_CONFIG` as the config file path override for `config init`, `config path`, `config show`, and retrieval commands.
+- Document macOS/Linux and Windows config paths explicitly.
+
 ## v2.0.0
 
 - Rename the project, Go module, npm package, CLI command, release artifacts, and Agent skill to Tanso.

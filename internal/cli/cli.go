@@ -276,7 +276,7 @@ func runConfig(p parsed, stdout, stderr io.Writer) int {
 		_, _ = fmt.Fprintf(stdout, "created config: %s\n", path)
 		return ExitOK
 	case "path":
-		path, err := config.DefaultPath()
+		path, err := config.ResolvePath(config.Options{})
 		if err != nil {
 			_, _ = fmt.Fprintln(stderr, err.Error())
 			return ExitConfig

@@ -137,8 +137,10 @@ Config file discovery:
 
 1. Explicit path from `--config`
 2. `TANSO_CONFIG`
-3. `$XDG_CONFIG_HOME/tanso/config.yaml`
+3. `$XDG_CONFIG_HOME/tanso/config.yaml`, when `XDG_CONFIG_HOME` is set
 4. `~/.config/tanso/config.yaml`
+
+The fallback default is intentionally the same Unix-style user path across supported platforms. On macOS this means `~/.config/tanso/config.yaml`, not `~/Library/Application Support/tanso/config.yaml`; on Windows this means `%USERPROFILE%\.config\tanso\config.yaml`, not `%AppData%\tanso\config.yaml`.
 
 If an explicit config path is provided and cannot be loaded, the command fails. If default paths do not exist, built-in defaults are used.
 

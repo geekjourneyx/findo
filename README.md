@@ -27,7 +27,7 @@ The npm package installs the matching GitHub Release binary for your platform an
 Alternative Go install:
 
 ```bash
-go install github.com/geekjourneyx/tanso/cmd/tanso@v2.0.0
+go install github.com/geekjourneyx/tanso/cmd/tanso@v2.0.1
 ```
 
 Prebuilt binaries and checksums are available on the [GitHub Releases](https://github.com/geekjourneyx/tanso/releases) page.
@@ -48,11 +48,14 @@ tanso config init
 tanso config path
 ```
 
-This creates a config file at the platform default path. On Linux this is typically:
+This creates a config file at Tanso's stable user config path:
 
-```text
-~/.config/tanso/config.yaml
-```
+| Platform | Default path |
+| --- | --- |
+| macOS/Linux | `~/.config/tanso/config.yaml` |
+| Windows | `%USERPROFILE%\.config\tanso\config.yaml` |
+
+If `XDG_CONFIG_HOME` is set, Tanso uses `$XDG_CONFIG_HOME/tanso/config.yaml`.
 
 Run `tanso config path` for the exact path on your machine.
 
@@ -78,12 +81,18 @@ zhihu:
   access_secret: ""
 ```
 
-Configuration precedence is:
+Configuration path resolution is:
 
-1. CLI flags
-2. Environment variables
-3. `--config` file or `~/.config/tanso/config.yaml`
-4. Built-in defaults
+1. `--config`
+2. `TANSO_CONFIG`
+3. `$XDG_CONFIG_HOME/tanso/config.yaml`, when `XDG_CONFIG_HOME` is set
+4. `~/.config/tanso/config.yaml`
+
+Configuration value precedence is:
+
+1. Provider environment variables
+2. Config file values
+3. Built-in defaults
 
 Inspect the merged config without leaking secrets:
 
@@ -141,7 +150,7 @@ Retrieval commands return a stable envelope. A successful JSON response looks li
 
 ```json
 {
-  "version": "2.0.0",
+  "version": "2.0.1",
   "query": {
     "text": "AI Agent 商业化",
     "mode": "search",

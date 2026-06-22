@@ -276,6 +276,25 @@ func TestConfigPath(t *testing.T) {
 	}
 }
 
+func TestConfigPathUsesTansoConfig(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "custom.yaml")
+	t.Setenv("TANSO_CONFIG", path)
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	code := Run([]string{"config", "path"}, "1.0.0", &stdout, &stderr)
+
+	if code != ExitOK {
+		t.Fatalf("exit code = %d, want %d; stderr=%q", code, ExitOK, stderr.String())
+	}
+	if got, want := stdout.String(), path+"\n"; got != want {
+		t.Fatalf("stdout = %q, want %q", got, want)
+	}
+	if got := stderr.String(); got != "" {
+		t.Fatalf("stderr = %q, want empty", got)
+	}
+}
+
 func TestConfigInitCreatesDefaultConfig(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "tanso.yaml")

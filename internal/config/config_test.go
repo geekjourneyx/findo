@@ -19,7 +19,7 @@ func TestDefaults(t *testing.T) {
 	}
 }
 
-func TestDefaultPathUsesUserConfigDir(t *testing.T) {
+func TestDefaultPathUsesXDGConfigHome(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", dir)
 
@@ -28,6 +28,21 @@ func TestDefaultPathUsesUserConfigDir(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := filepath.Join(dir, "tanso", "config.yaml")
+	if path != want {
+		t.Fatalf("path = %q, want %q", path, want)
+	}
+}
+
+func TestDefaultPathUsesHomeDotConfigWithoutXDG(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("XDG_CONFIG_HOME", "")
+
+	path, err := DefaultPath()
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := filepath.Join(home, ".config", "tanso", "config.yaml")
 	if path != want {
 		t.Fatalf("path = %q, want %q", path, want)
 	}
@@ -51,6 +66,22 @@ func TestLoadReadsDefaultPathWhenPresent(t *testing.T) {
 	}
 	if cfg.Search.Limit != 7 {
 		t.Fatalf("limit = %d, want 7", cfg.Search.Limit)
+	}
+}
+
+func TestLoadReadsTansoConfigPath(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "custom.yaml")
+	if err := os.WriteFile(path, []byte("search:\n  limit: 6\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("TANSO_CONFIG", path)
+
+	cfg, err := Load(Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Search.Limit != 6 {
+		t.Fatalf("limit = %d, want 6", cfg.Search.Limit)
 	}
 }
 
@@ -82,6 +113,13 @@ func TestInitWritesDefaultConfig(t *testing.T) {
 	}
 	if got := info.Mode().Perm(); got != 0600 {
 		t.Fatalf("mode = %v, want 0600", got)
+	}
+	dirInfo, err := os.Stat(filepath.Dir(path))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := dirInfo.Mode().Perm(); got != 0700 {
+		t.Fatalf("dir mode = %v, want 0700", got)
 	}
 	b, err := os.ReadFile(path)
 	if err != nil {

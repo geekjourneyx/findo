@@ -14,6 +14,8 @@ type Options struct {
 	DisableDefaultPath bool
 }
 
+const EnvConfig = "TANSO_CONFIG"
+
 type Config struct {
 	Search     SearchConfig     `yaml:"search" json:"search"`
 	Bocha      BochaConfig      `yaml:"bocha" json:"bocha"`
@@ -86,24 +88,46 @@ func Defaults() Config {
 }
 
 func DefaultPath() (string, error) {
-	dir, err := os.UserConfigDir()
+	if dir := os.Getenv("XDG_CONFIG_HOME"); dir != "" {
+		return filepath.Join(dir, "tanso", "config.yaml"), nil
+	}
+	home, err := os.UserHomeDir()
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(dir, "tanso", "config.yaml"), nil
+	return filepath.Join(home, ".config", "tanso", "config.yaml"), nil
+}
+
+func ResolvePath(opts Options) (string, error) {
+	if opts.Path != "" {
+		return opts.Path, nil
+	}
+	if !opts.DisableEnv {
+		if path := os.Getenv(EnvConfig); path != "" {
+			return path, nil
+		}
+	}
+	if opts.DisableDefaultPath {
+		return "", nil
+	}
+	return DefaultPath()
 }
 
 func Load(opts Options) (Config, error) {
 	cfg := Defaults()
 	path := opts.Path
+	if path == "" && !opts.DisableEnv {
+		path = os.Getenv(EnvConfig)
+	}
 	if path == "" && !opts.DisableDefaultPath {
 		defaultPath, err := DefaultPath()
-		if err == nil {
-			if _, err := os.Stat(defaultPath); err == nil {
-				path = defaultPath
-			} else if !errors.Is(err, os.ErrNotExist) {
-				return cfg, err
-			}
+		if err != nil {
+			return cfg, err
+		}
+		if _, err := os.Stat(defaultPath); err == nil {
+			path = defaultPath
+		} else if !errors.Is(err, os.ErrNotExist) {
+			return cfg, err
 		}
 	}
 	if path != "" {
@@ -126,11 +150,11 @@ func Load(opts Options) (Config, error) {
 
 func Init(path string, force bool) (string, error) {
 	if path == "" {
-		defaultPath, err := DefaultPath()
+		resolved, err := ResolvePath(Options{})
 		if err != nil {
 			return "", err
 		}
-		path = defaultPath
+		path = resolved
 	}
 	if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
 		return "", err
