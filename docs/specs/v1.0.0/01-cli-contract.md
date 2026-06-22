@@ -22,10 +22,14 @@ tanso zhihu web <query>
 tanso zhihu hot
 
 tanso sources
-tanso config
+tanso config init
+tanso config path
+tanso config show --json
 tanso init
 tanso version
+tanso --version
 tanso help
+tanso --help
 ```
 
 ### v1.0.0 Command Matrix
@@ -40,11 +44,14 @@ tanso help
 | `tanso zhihu <query>` | `zhihu_search` | `zhihu` | `web_search` | stable envelope |
 | `tanso zhihu web <query>` | `zhihu_web` | `zhihu` | `web_search` | stable envelope |
 | `tanso zhihu hot` | `zhihu_hot` | `zhihu` | `hotlist` | stable envelope |
-| `tanso sources` | n/a | mixed | inspection | stable envelope with source status |
-| `tanso config` | n/a | mixed | inspection | redacted human output; JSON when `--json` |
-| `tanso init` | n/a | mixed | config creation | human output |
+| `tanso sources` | n/a | mixed | inspection | source inventory; JSON when `--json` |
+| `tanso config init` | n/a | mixed | config creation | human output |
+| `tanso config path` | n/a | mixed | inspection | config path text |
+| `tanso config show --json` | n/a | mixed | inspection | redacted JSON config |
+| `tanso init` | n/a | mixed | config creation | alias for `tanso config init` |
 | `tanso version` | n/a | n/a | inspection | stable text; JSON when `--json` |
-| `tanso help` | n/a | n/a | inspection | human output |
+| `tanso --version` | n/a | n/a | inspection | stable text |
+| `tanso help`, `tanso --help`, `tanso <command> --help` | n/a | n/a | inspection | human output |
 
 Deferred commands are not part of the v1.0.0 public contract until their source specs are complete: `tanso bocha image <query>` and `tanso zhihu answer <query>`.
 
@@ -82,8 +89,8 @@ Flag behavior:
 - `--timeout` is a total command timeout. Provider calls receive derived contexts.
 - `--source` accepts source IDs. It may be repeated or comma-separated for generic commands.
 - Family aliases may expand deterministically in generic commands: `bocha` -> `bocha_web`, `volcengine` -> `volcengine_answer`, `zhihu` -> `zhihu_search`.
-- `--raw` prints provider-shaped data and is not a stable public schema.
-- `--verbose` adds diagnostics to `stderr` only.
+- `--raw` currently prints the same JSON retrieval envelope as `--json`; provider-shaped raw output is deferred.
+- `--no-color` and `--verbose` are accepted for script compatibility; current output has no color and verbose diagnostics are deferred.
 
 Source-specific flags:
 
@@ -423,7 +430,11 @@ Inspection commands do not use the retrieval envelope.
 }
 ```
 
-`tanso config --json` returns redacted resolved config. Secret values must be either omitted or rendered as `"***"`.
+`configured` reports whether local credential material is present after normal
+config/env resolution. It does not perform a live provider authentication check;
+downstream agents must use real query status to verify credential validity.
+
+`tanso config show --json` returns redacted resolved config. Secret values must be either omitted or rendered as `"***"`.
 
 ## Compatibility Rules
 

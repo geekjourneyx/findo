@@ -43,6 +43,57 @@ func TestVersionJSON(t *testing.T) {
 	}
 }
 
+func TestVersionLongFlag(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	code := Run([]string{"--version"}, "1.0.0", &stdout, &stderr)
+
+	if code != ExitOK {
+		t.Fatalf("exit code = %d, want %d", code, ExitOK)
+	}
+	if got, want := stdout.String(), "tanso 1.0.0\n"; got != want {
+		t.Fatalf("stdout = %q, want %q", got, want)
+	}
+	if got := stderr.String(); got != "" {
+		t.Fatalf("stderr = %q, want empty", got)
+	}
+}
+
+func TestHelpFlags(t *testing.T) {
+	tests := []struct {
+		name string
+		args []string
+		want string
+	}{
+		{name: "root long", args: []string{"--help"}, want: "Usage:"},
+		{name: "root short", args: []string{"-h"}, want: "Global flags:"},
+		{name: "help topic", args: []string{"help", "bocha"}, want: "tanso bocha <query>"},
+		{name: "subcommand", args: []string{"bocha", "--help"}, want: "tanso bocha <query>"},
+		{name: "nested subcommand", args: []string{"config", "init", "--help"}, want: "tanso config init"},
+		{name: "zhihu web", args: []string{"zhihu", "web", "--help"}, want: "--search-db"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var stdout bytes.Buffer
+			var stderr bytes.Buffer
+
+			code := Run(tt.args, "1.0.0", &stdout, &stderr)
+
+			if code != ExitOK {
+				t.Fatalf("exit code = %d, want %d; stderr=%q", code, ExitOK, stderr.String())
+			}
+			if !strings.Contains(stdout.String(), tt.want) {
+				t.Fatalf("stdout missing %q:\n%s", tt.want, stdout.String())
+			}
+			if got := stderr.String(); got != "" {
+				t.Fatalf("stderr = %q, want empty", got)
+			}
+		})
+	}
+}
+
 func TestInvalidSourceSpecificFlagOnWrongCommand(t *testing.T) {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
@@ -68,6 +119,25 @@ func TestInvalidSearchDBOnWrongCommand(t *testing.T) {
 	}
 	if !strings.Contains(stderr.String(), "--search-db is only valid for tanso zhihu web") {
 		t.Fatalf("stderr = %q", stderr.String())
+	}
+}
+
+func TestZhihuWebSourceSpecificFlagsAllowLeadingGlobalFlags(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	t.Setenv("ZHIHU_ACCESS_SECRET", "")
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	code := Run([]string{"--json", "zhihu", "web", "ChatGPT", "--filter", `host=="example.com"`}, "1.0.0", &stdout, &stderr)
+
+	if code != ExitCredential {
+		t.Fatalf("exit code = %d, want %d; stdout=%q stderr=%q", code, ExitCredential, stdout.String(), stderr.String())
+	}
+	if !strings.Contains(stdout.String(), `"source":"zhihu_web"`) {
+		t.Fatalf("stdout = %q", stdout.String())
+	}
+	if strings.Contains(stderr.String(), "--filter is only valid") {
+		t.Fatalf("stderr should not reject valid zhihu web flags: %q", stderr.String())
 	}
 }
 
@@ -133,7 +203,122 @@ func TestInvalidFlagsAndPositionalsOnImplementedCommands(t *testing.T) {
 	}
 }
 
+func TestDefaultQueryRunsConfiguredDefaultSources(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	t.Setenv("TANSO_CONFIG", "")
+	t.Setenv("BOCHA_API_KEY", "")
+	t.Setenv("ARK_API_KEY", "")
+	t.Setenv("VOLCENGINE_API_KEY", "")
+	t.Setenv("ZHIHU_ACCESS_SECRET", "")
+	t.Setenv("ZHIHU_API_KEY", "")
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	code := Run([]string{"AI Agent 商业化", "--json"}, "1.0.0", &stdout, &stderr)
+
+	if code != ExitCredential {
+		t.Fatalf("exit code = %d, want %d; stdout=%q stderr=%q", code, ExitCredential, stdout.String(), stderr.String())
+	}
+	out := stdout.String()
+	for _, want := range []string{`"text":"AI Agent 商业化"`, `"mode":"mixed"`, `"source":"bocha_web"`, `"source":"volcengine_answer"`, `"source":"zhihu_search"`} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("stdout missing %s: %s", want, out)
+		}
+	}
+	if got := stderr.String(); got != "" {
+		t.Fatalf("stderr = %q, want empty", got)
+	}
+}
+
+func TestAllQueryRunsAllSearchAndAnswerSources(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	t.Setenv("TANSO_CONFIG", "")
+	t.Setenv("BOCHA_API_KEY", "")
+	t.Setenv("ARK_API_KEY", "")
+	t.Setenv("VOLCENGINE_API_KEY", "")
+	t.Setenv("ZHIHU_ACCESS_SECRET", "")
+	t.Setenv("ZHIHU_API_KEY", "")
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	code := Run([]string{"all", "AI Agent 商业化", "--json"}, "1.0.0", &stdout, &stderr)
+
+	if code != ExitCredential {
+		t.Fatalf("exit code = %d, want %d; stdout=%q stderr=%q", code, ExitCredential, stdout.String(), stderr.String())
+	}
+	out := stdout.String()
+	for _, want := range []string{`"source":"bocha_web"`, `"source":"volcengine_answer"`, `"source":"zhihu_search"`, `"source":"zhihu_web"`} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("stdout missing %s: %s", want, out)
+		}
+	}
+	if strings.Contains(out, `"source":"zhihu_hot"`) {
+		t.Fatalf("generic all should not include hotlist: %s", out)
+	}
+	if got := stderr.String(); got != "" {
+		t.Fatalf("stderr = %q, want empty", got)
+	}
+}
+
+func TestGenericSourceFlagLimitsSources(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	t.Setenv("TANSO_CONFIG", "")
+	t.Setenv("BOCHA_API_KEY", "")
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	code := Run([]string{"AI Agent 商业化", "--source", "bocha_web", "--json"}, "1.0.0", &stdout, &stderr)
+
+	if code != ExitCredential {
+		t.Fatalf("exit code = %d, want %d; stdout=%q stderr=%q", code, ExitCredential, stdout.String(), stderr.String())
+	}
+	out := stdout.String()
+	if !strings.Contains(out, `"sources":["bocha_web"]`) || strings.Contains(out, `"source":"zhihu_search"`) {
+		t.Fatalf("unexpected sources: %s", out)
+	}
+}
+
+func TestSourceFlagRejectedOnExplicitSourceCommand(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	code := Run([]string{"bocha", "query", "--source", "bocha_web"}, "1.0.0", &stdout, &stderr)
+
+	if code != ExitInvalidArgument {
+		t.Fatalf("exit code = %d, want %d", code, ExitInvalidArgument)
+	}
+	if !strings.Contains(stderr.String(), "--source is only valid") {
+		t.Fatalf("stderr = %q", stderr.String())
+	}
+}
+
+func TestHumanFailureWritesDiagnosticsToStderr(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	t.Setenv("BOCHA_API_KEY", "")
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	code := Run([]string{"bocha", "AI Agent 商业化"}, "1.0.0", &stdout, &stderr)
+
+	if code != ExitCredential {
+		t.Fatalf("exit code = %d, want %d", code, ExitCredential)
+	}
+	if got := stdout.String(); got != "" {
+		t.Fatalf("stdout = %q, want empty", got)
+	}
+	if !strings.Contains(stderr.String(), "CREDENTIAL_MISSING") {
+		t.Fatalf("stderr missing diagnostic: %q", stderr.String())
+	}
+}
+
 func TestSourcesJSON(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	t.Setenv("TANSO_CONFIG", "")
+	t.Setenv("BOCHA_API_KEY", "")
+	t.Setenv("ARK_API_KEY", "")
+	t.Setenv("VOLCENGINE_API_KEY", "")
+	t.Setenv("ZHIHU_ACCESS_SECRET", "")
+	t.Setenv("ZHIHU_API_KEY", "")
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 
@@ -150,9 +335,103 @@ func TestSourcesJSON(t *testing.T) {
 			t.Fatalf("stdout missing source %q: %q", source, stdout.String())
 		}
 	}
+	got := decodeSourcesJSON(t, stdout.Bytes())
+	for _, source := range got.Sources {
+		if source.Configured {
+			t.Fatalf("source %s configured = true, want false", source.Source)
+		}
+	}
 	if got := stderr.String(); got != "" {
 		t.Fatalf("stderr = %q, want empty", got)
 	}
+}
+
+func TestSourcesJSONMarksConfiguredFromEnv(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	t.Setenv("TANSO_CONFIG", "")
+	t.Setenv("BOCHA_API_KEY", "bocha-env-secret")
+	t.Setenv("ARK_API_KEY", "ark-env-secret")
+	t.Setenv("VOLCENGINE_API_KEY", "")
+	t.Setenv("ZHIHU_ACCESS_SECRET", "zhihu-env-secret")
+	t.Setenv("ZHIHU_API_KEY", "")
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	code := Run([]string{"sources", "--json"}, "1.0.0", &stdout, &stderr)
+
+	if code != ExitOK {
+		t.Fatalf("exit code = %d, want %d; stderr=%q", code, ExitOK, stderr.String())
+	}
+	got := decodeSourcesJSON(t, stdout.Bytes())
+	for _, source := range got.Sources {
+		if !source.Configured {
+			t.Fatalf("source %s configured = false, want true", source.Source)
+		}
+	}
+	if got := stderr.String(); got != "" {
+		t.Fatalf("stderr = %q, want empty", got)
+	}
+}
+
+func TestSourcesJSONMarksConfiguredFromConfigPath(t *testing.T) {
+	t.Setenv("BOCHA_API_KEY", "")
+	t.Setenv("ARK_API_KEY", "")
+	t.Setenv("VOLCENGINE_API_KEY", "")
+	t.Setenv("ZHIHU_ACCESS_SECRET", "")
+	t.Setenv("ZHIHU_API_KEY", "")
+	path := filepath.Join(t.TempDir(), "tanso.yaml")
+	err := os.WriteFile(path, []byte(`
+bocha:
+  api_key: bocha-file-secret
+`), 0600)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	code := Run([]string{"sources", "--json", "--config", path}, "1.0.0", &stdout, &stderr)
+
+	if code != ExitOK {
+		t.Fatalf("exit code = %d, want %d; stderr=%q", code, ExitOK, stderr.String())
+	}
+	got := decodeSourcesJSON(t, stdout.Bytes())
+	if !configuredFor(got, "bocha_web") {
+		t.Fatalf("bocha_web configured = false, want true: %#v", got.Sources)
+	}
+	for _, source := range []string{"volcengine_answer", "zhihu_search", "zhihu_web", "zhihu_hot"} {
+		if configuredFor(got, source) {
+			t.Fatalf("%s configured = true, want false: %#v", source, got.Sources)
+		}
+	}
+	if got := stderr.String(); got != "" {
+		t.Fatalf("stderr = %q, want empty", got)
+	}
+}
+
+type sourcesResponse struct {
+	Sources []struct {
+		Source     string `json:"source"`
+		Configured bool   `json:"configured"`
+	} `json:"sources"`
+}
+
+func decodeSourcesJSON(t *testing.T, b []byte) sourcesResponse {
+	t.Helper()
+	var got sourcesResponse
+	if err := json.Unmarshal(b, &got); err != nil {
+		t.Fatalf("unmarshal stdout: %v\n%s", err, string(b))
+	}
+	return got
+}
+
+func configuredFor(got sourcesResponse, source string) bool {
+	for _, item := range got.Sources {
+		if item.Source == source {
+			return item.Configured
+		}
+	}
+	return false
 }
 
 func TestSkillsListJSON(t *testing.T) {
@@ -371,6 +650,31 @@ func TestConfigInitForceOverwrites(t *testing.T) {
 	}
 }
 
+func TestInitAliasAcceptsPathAndForce(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "tanso.yaml")
+	if err := os.WriteFile(path, []byte("existing"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	code := Run([]string{"init", "--path", path, "--force"}, "1.0.0", &stdout, &stderr)
+
+	if code != ExitOK {
+		t.Fatalf("exit code = %d, want %d; stderr=%q", code, ExitOK, stderr.String())
+	}
+	if !strings.Contains(stdout.String(), "created config: "+path) {
+		t.Fatalf("stdout = %q", stdout.String())
+	}
+	b, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(b) == "existing" {
+		t.Fatalf("config was not overwritten")
+	}
+}
+
 func TestConfigShowJSONRedactsSecrets(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "tanso.yaml")
 	err := os.WriteFile(path, []byte(`
@@ -465,6 +769,23 @@ func TestRetrievalReadsDefaultConfigPath(t *testing.T) {
 	}
 	if !strings.Contains(stderr.String(), "search.limit must be 1..50") {
 		t.Fatalf("stderr = %q", stderr.String())
+	}
+}
+
+func TestRetrievalConfigErrorUsesJSONWhenRequested(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	code := Run([]string{"bocha", "query", "--json", "--config", filepath.Join(t.TempDir(), "missing.yaml")}, "1.0.0", &stdout, &stderr)
+
+	if code != ExitConfig {
+		t.Fatalf("exit code = %d, want %d; stdout=%q stderr=%q", code, ExitConfig, stdout.String(), stderr.String())
+	}
+	if !strings.Contains(stdout.String(), `"status":"error"`) || !strings.Contains(stdout.String(), `"code":"CONFIG_INVALID"`) {
+		t.Fatalf("stdout = %q", stdout.String())
+	}
+	if got := stderr.String(); got != "" {
+		t.Fatalf("stderr = %q, want empty", got)
 	}
 }
 

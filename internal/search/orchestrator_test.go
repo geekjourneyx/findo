@@ -17,6 +17,17 @@ func TestDecideAllOK(t *testing.T) {
 	}
 }
 
+func TestDecideAllOKButNoResults(t *testing.T) {
+	status, code, exit := Decide([]SourceStatus{
+		{Status: SourceStatusOK, Results: 0},
+		{Status: SourceStatusOK, Results: 0},
+	})
+
+	if status != StatusError || code != tansoerr.NoResults || exit != tansoerr.ExitCodeForCode(tansoerr.NoResults) {
+		t.Fatalf("got %s %q %d", status, code, exit)
+	}
+}
+
 func TestDecidePartialUsesFirstFailureCode(t *testing.T) {
 	timeoutErr := tansoerr.Error{Code: tansoerr.SourceTimeout, Message: "timeout", Retryable: true}
 	rateLimitErr := tansoerr.Error{Code: tansoerr.SourceRateLimited, Message: "rate limited", Retryable: true}

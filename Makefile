@@ -1,4 +1,4 @@
-VERSION ?= 2.0.1
+VERSION ?= 2.0.2
 LDFLAGS := -s -w -X main.version=$(VERSION)
 
 .PHONY: build test lint version-check release-check smoke-bocha smoke-volcengine smoke-zhihu

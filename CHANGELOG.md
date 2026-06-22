@@ -1,5 +1,17 @@
 # Changelog
 
+## v2.0.2
+
+- Add Unix-style `--help`, `-h`, command-specific help, and `--version`.
+- Restore generic `tanso <query>` and `tanso all <query>` retrieval commands.
+- Accept `--timeout`, `--source`, `--no-color`, and `--verbose` according to the public CLI contract.
+- Make human table/Markdown failure paths print diagnostics to `stderr`.
+- Fix source-specific flag validation when global flags appear before `zhihu web`.
+- Make `tanso sources --json` report local credential presence after config/env resolution.
+- Clarify that `configured` is inventory metadata, not a live provider authentication check.
+- Return `NO_RESULTS` when all successful sources return zero results.
+- Add regression tests for agent-friendly command discovery, generic retrieval, source credential metadata, and config errors.
+
 ## v2.0.1
 
 - Use a stable default config path across platforms: `~/.config/tanso/config.yaml`.

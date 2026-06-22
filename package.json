@@ -1,6 +1,6 @@
 {
   "name": "@geekjourneyx/tanso",
-  "version": "2.0.1",
+  "version": "2.0.2",
   "description": "Install Tanso, an AI Search CLI for exploring Chinese internet signals.",
   "license": "MIT",
   "repository": {

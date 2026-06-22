@@ -27,7 +27,7 @@ The npm package installs the matching GitHub Release binary for your platform an
 Alternative Go install:
 
 ```bash
-go install github.com/geekjourneyx/tanso/cmd/tanso@v2.0.1
+go install github.com/geekjourneyx/tanso/cmd/tanso@v2.0.2
 ```
 
 Prebuilt binaries and checksums are available on the [GitHub Releases](https://github.com/geekjourneyx/tanso/releases) page.
@@ -100,6 +100,10 @@ Inspect the merged config without leaking secrets:
 tanso config show --json
 ```
 
+`tanso sources --json` is an inventory endpoint. Its `configured` field only means
+local credential material is present after config/env resolution; it is not a live
+authentication check. Use a real source query to verify whether credentials work.
+
 Before publishing a release, verify version alignment across `package.json`, `Makefile`, `CHANGELOG.md`, and the release tag:
 
 ```bash
@@ -111,11 +115,14 @@ make release-check
 
 ```bash
 tanso version
+tanso --help
 tanso sources --json
 tanso skills list --json
 tanso skills read tanso --json
 
 tanso "AI Agent 商业化" --json
+tanso all "AI Agent 商业化" --json
+tanso "AI Agent 商业化" --source bocha_web --source zhihu_search --json
 BOCHA_API_KEY=... tanso bocha "AI Agent 商业化" --json
 BOCHA_API_KEY=... tanso bocha "微信 AI Agent" --json
 ARK_API_KEY=... tanso volc "瑞幸咖啡 2026 门店数是否可信" --json
@@ -124,7 +131,7 @@ ZHIHU_ACCESS_SECRET=... tanso zhihu web "ChatGPT 桌面版" --json
 ZHIHU_ACCESS_SECRET=... tanso zhihu hot --json
 ```
 
-Human output defaults to a table. Use `--json` for scripts, agents, CI, and downstream tools.
+Human output defaults to a table. Use `--json` for scripts, agents, CI, and downstream tools. Use `tanso --help` or `tanso <command> --help` to inspect the installed CLI surface.
 
 ## Agent Skill
 
@@ -150,7 +157,7 @@ Retrieval commands return a stable envelope. A successful JSON response looks li
 
 ```json
 {
-  "version": "2.0.1",
+  "version": "2.0.2",
   "query": {
     "text": "AI Agent 商业化",
     "mode": "search",

@@ -42,11 +42,17 @@ type parsed struct {
 	Raw          bool
 	Filter       string
 	SearchDB     string
+	Timeout      string
+	SourceIDs    []string
 	Limit        int
 	LimitSet     bool
 	ConfigPath   string
 	Path         string
 	Force        bool
+	Help         bool
+	Version      bool
+	NoColor      bool
+	Verbose      bool
 	UnknownFlags []string
 }
 
@@ -56,15 +62,29 @@ func Run(args []string, version string, stdout, stderr io.Writer) int {
 		_, _ = fmt.Fprintln(stderr, err.Error())
 		return ExitInvalidArgument
 	}
-	if p.Filter != "" && !isZhihuWebCommand(args) {
+	if p.Version && p.Command == "" {
+		return runVersion(p, version, stdout, stderr)
+	}
+	if p.Help {
+		return runHelp(p, stdout, stderr)
+	}
+	if p.Filter != "" && !isZhihuWebCommand(p) {
 		_, _ = fmt.Fprintln(stderr, "--filter is only valid for tanso zhihu web")
 		return ExitInvalidArgument
 	}
-	if p.SearchDB != "" && !isZhihuWebCommand(args) {
+	if p.SearchDB != "" && !isZhihuWebCommand(p) {
 		_, _ = fmt.Fprintln(stderr, "--search-db is only valid for tanso zhihu web")
 		return ExitInvalidArgument
 	}
 	if err := validateOutputModes(p); err != nil {
+		_, _ = fmt.Fprintln(stderr, err.Error())
+		return ExitInvalidArgument
+	}
+	if err := validateSourceFlag(p); err != nil {
+		_, _ = fmt.Fprintln(stderr, err.Error())
+		return ExitInvalidArgument
+	}
+	if err := validateTimeout(p); err != nil {
 		_, _ = fmt.Fprintln(stderr, err.Error())
 		return ExitInvalidArgument
 	}
@@ -77,24 +97,10 @@ func Run(args []string, version string, stdout, stderr io.Writer) int {
 		return ExitInvalidArgument
 	}
 	if len(args) == 0 || p.Command == "help" {
-		if err := validateHelp(p); err != nil {
-			_, _ = fmt.Fprintln(stderr, err.Error())
-			return ExitInvalidArgument
-		}
-		_, _ = fmt.Fprintln(stdout, "tanso <query>")
-		return ExitOK
+		return runHelp(p, stdout, stderr)
 	}
 	if p.Command == "version" {
-		if err := validateVersion(p); err != nil {
-			_, _ = fmt.Fprintln(stderr, err.Error())
-			return ExitInvalidArgument
-		}
-		if p.JSON {
-			_, _ = fmt.Fprintf(stdout, `{"version":%q}`+"\n", version)
-			return ExitOK
-		}
-		_, _ = fmt.Fprintf(stdout, "tanso %s\n", version)
-		return ExitOK
+		return runVersion(p, version, stdout, stderr)
 	}
 	if p.Command == "sources" {
 		if err := validateSources(p); err != nil {
@@ -102,11 +108,20 @@ func Run(args []string, version string, stdout, stderr io.Writer) int {
 			return ExitInvalidArgument
 		}
 		if p.JSON {
-			_ = output.WriteJSON(stdout, map[string]any{"version": version, "sources": sourcepkg.StaticInfos()})
+			cfg, err := config.Load(config.Options{Path: p.ConfigPath})
+			if err != nil {
+				return writeCommandError(stdout, stderr, p, tansoerr.ConfigInvalid, err.Error(), ExitConfig)
+			}
+			_ = output.WriteJSON(stdout, map[string]any{"version": version, "sources": sourcepkg.Infos(cfg)})
 			return ExitOK
 		}
 		writeSourcesText(stdout)
 		return ExitOK
+	}
+	if p.Command == "init" {
+		p.Command = "config"
+		p.Positionals = append([]string{"init"}, p.Positionals...)
+		return runConfig(p, stdout, stderr)
 	}
 	if p.Command == "skills" {
 		return runSkills(p, version, stdout, stderr)
@@ -117,6 +132,9 @@ func Run(args []string, version string, stdout, stderr io.Writer) int {
 	if isRetrievalCommand(p) {
 		return runRetrieval(p, version, stdout, stderr)
 	}
+	if isGenericCommand(p) {
+		return runGenericRetrieval(p, version, stdout, stderr)
+	}
 
 	_, _ = fmt.Fprintf(stderr, "unknown command: %s\n", args[0])
 	return ExitInvalidArgument
@@ -126,6 +144,10 @@ func parse(args []string) (parsed, error) {
 	p := parsed{}
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
+		case "--help", "-h":
+			p.Help = true
+		case "--version":
+			p.Version = true
 		case "--json":
 			p.JSON = true
 		case "--markdown":
@@ -157,6 +179,23 @@ func parse(args []string) (parsed, error) {
 			p.Limit = limit
 			p.LimitSet = true
 			i++
+		case "--timeout":
+			if i+1 >= len(args) {
+				return p, fmt.Errorf("--timeout requires a value")
+			}
+			p.Timeout = args[i+1]
+			i++
+		case "--source":
+			if i+1 >= len(args) {
+				return p, fmt.Errorf("--source requires a value")
+			}
+			for _, item := range strings.Split(args[i+1], ",") {
+				item = strings.TrimSpace(item)
+				if item != "" {
+					p.SourceIDs = append(p.SourceIDs, item)
+				}
+			}
+			i++
 		case "--config":
 			if i+1 >= len(args) {
 				return p, fmt.Errorf("--config requires a value")
@@ -171,6 +210,10 @@ func parse(args []string) (parsed, error) {
 			i++
 		case "--force":
 			p.Force = true
+		case "--no-color":
+			p.NoColor = true
+		case "--verbose":
+			p.Verbose = true
 		default:
 			if len(args[i]) > 0 && args[i][0] == '-' {
 				p.UnknownFlags = append(p.UnknownFlags, args[i])
@@ -184,6 +227,169 @@ func parse(args []string) (parsed, error) {
 		}
 	}
 	return p, nil
+}
+
+func runVersion(p parsed, version string, stdout, stderr io.Writer) int {
+	if err := validateVersion(p); err != nil {
+		_, _ = fmt.Fprintln(stderr, err.Error())
+		return ExitInvalidArgument
+	}
+	if p.JSON {
+		_, _ = fmt.Fprintf(stdout, `{"version":%q}`+"\n", version)
+		return ExitOK
+	}
+	_, _ = fmt.Fprintf(stdout, "tanso %s\n", version)
+	return ExitOK
+}
+
+func runHelp(p parsed, stdout, stderr io.Writer) int {
+	if err := validateHelp(p); err != nil {
+		_, _ = fmt.Fprintln(stderr, err.Error())
+		return ExitInvalidArgument
+	}
+	topic := helpTopic(p)
+	_, _ = io.WriteString(stdout, helpText(topic))
+	return ExitOK
+}
+
+func helpTopic(p parsed) string {
+	if p.Command == "help" {
+		return strings.Join(p.Positionals, " ")
+	}
+	parts := []string{}
+	if p.Command != "" {
+		parts = append(parts, p.Command)
+	}
+	parts = append(parts, p.Positionals...)
+	return strings.Join(parts, " ")
+}
+
+func helpText(topic string) string {
+	switch topic {
+	case "bocha":
+		return `Usage:
+  tanso bocha <query> [--json|--markdown|--table|--raw] [--limit 1..50] [--timeout duration] [--config path]
+
+Search broad web evidence through Bocha.
+`
+	case "volc", "volc answer":
+		return `Usage:
+  tanso volc <query> [--json|--markdown|--table|--raw] [--limit 1..50] [--timeout duration] [--config path]
+  tanso volc answer <query> [flags]
+
+Return a web-grounded answer through Volcengine Ark.
+`
+	case "zhihu":
+		return `Usage:
+  tanso zhihu <query> [--json|--markdown|--table|--raw] [--limit 1..50] [--timeout duration] [--config path]
+  tanso zhihu web <query> [--filter string] [--search-db all|realtime|static] [flags]
+  tanso zhihu hot [--json|--markdown|--table|--raw] [--limit 1..50] [flags]
+
+Search Zhihu discussions, Zhihu-backed web results, or the current hotlist.
+`
+	case "zhihu web":
+		return `Usage:
+  tanso zhihu web <query> [--filter string] [--search-db all|realtime|static] [--json|--markdown|--table|--raw] [--limit 1..50] [--timeout duration] [--config path]
+
+Search the web through Zhihu's global search API.
+`
+	case "zhihu hot", "hot zhihu":
+		return `Usage:
+  tanso zhihu hot [--json|--markdown|--table|--raw] [--limit 1..50] [--timeout duration] [--config path]
+
+Return the current Zhihu hotlist.
+`
+	case "sources":
+		return `Usage:
+  tanso sources [--json] [--config path]
+
+List source inventory. In JSON output, configured means local credential material is present; it is not a live authentication check.
+`
+	case "config":
+		return `Usage:
+  tanso config init [--path path] [--force]
+  tanso config path
+  tanso config show --json [--config path]
+
+Create, locate, or inspect the resolved Tanso config.
+`
+	case "config init", "init":
+		return `Usage:
+  tanso config init [--path path] [--force]
+  tanso init [--path path] [--force]
+
+Create the default config file. Parent directories are created automatically.
+`
+	case "config path":
+		return `Usage:
+  tanso config path
+
+Print the resolved config path.
+`
+	case "config show":
+		return `Usage:
+  tanso config show --json [--config path]
+
+Print the merged config with secrets redacted.
+`
+	case "skills":
+		return `Usage:
+  tanso skills list [--json]
+  tanso skills read <name>[/<path>] [path] [--json]
+
+Read Agent Skill instructions bundled with the installed CLI.
+`
+	case "skills list":
+		return `Usage:
+  tanso skills list [--json]
+
+List bundled Agent Skills.
+`
+	case "skills read":
+		return `Usage:
+  tanso skills read <name>[/<path>] [path] [--json]
+
+Read bundled Agent Skill content.
+`
+	case "version":
+		return `Usage:
+  tanso version [--json]
+  tanso --version
+
+Print the CLI version.
+`
+	default:
+		return `Usage:
+  tanso <query> [--json|--markdown|--table|--raw] [--source source_id] [--limit 1..50] [--timeout duration] [--config path]
+  tanso all <query> [flags]
+  tanso bocha <query> [flags]
+  tanso volc <query> [flags]
+  tanso zhihu <query> [flags]
+  tanso zhihu web <query> [--filter string] [--search-db all|realtime|static] [flags]
+  tanso zhihu hot [flags]
+  tanso sources [--json]
+  tanso config <init|path|show>
+  tanso skills <list|read>
+  tanso version
+
+Global flags:
+  --json          machine-readable JSON
+  --markdown      Markdown output for research reports
+  --table         tabular human output
+  --raw           raw JSON envelope for provider debugging
+  --limit int     requested per-source limit, 1..50
+  --timeout dur   total command timeout, for example 10s
+  --config path   config file path
+  --source id     source id for generic query; repeat or comma-separate
+  --no-color      accepted for script compatibility
+  --verbose       accepted for script compatibility
+  --help, -h      show help
+  --version       show version
+
+Source IDs:
+  bocha_web, volcengine_answer, zhihu_search, zhihu_web, zhihu_hot
+`
+	}
 }
 
 func runSkills(p parsed, version string, stdout, stderr io.Writer) int {
@@ -286,8 +492,7 @@ func runConfig(p parsed, stdout, stderr io.Writer) int {
 	case "show":
 		cfg, err := config.Load(config.Options{Path: p.ConfigPath})
 		if err != nil {
-			_, _ = fmt.Fprintln(stderr, err.Error())
-			return ExitConfig
+			return writeCommandError(stdout, stderr, p, tansoerr.ConfigInvalid, err.Error(), ExitConfig)
 		}
 		if err := output.WriteJSON(stdout, cfg.Redacted()); err != nil {
 			_, _ = fmt.Fprintln(stderr, err.Error())
@@ -307,8 +512,7 @@ func runRetrieval(p parsed, version string, stdout, stderr io.Writer) int {
 	}
 	cfg, err := config.Load(config.Options{Path: p.ConfigPath})
 	if err != nil {
-		_, _ = fmt.Fprintln(stderr, err.Error())
-		return ExitConfig
+		return writeCommandError(stdout, stderr, p, tansoerr.ConfigInvalid, err.Error(), ExitConfig)
 	}
 	plan, err := retrievalPlan(p, cfg)
 	if err != nil {
@@ -316,7 +520,7 @@ func runRetrieval(p parsed, version string, stdout, stderr io.Writer) int {
 		return ExitInvalidArgument
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), parseTimeout(cfg.Search.Timeout))
+	ctx, cancel := context.WithTimeout(context.Background(), commandTimeout(p, cfg))
 	defer cancel()
 
 	start := time.Now()
@@ -339,7 +543,67 @@ func runRetrieval(p parsed, version string, stdout, stderr io.Writer) int {
 		SourceStatus: []search.SourceStatus{status},
 		Errors:       errorsOut,
 	}
-	if err := writeEnvelope(stdout, env, p); err != nil {
+	if err := writeEnvelope(stdout, stderr, env, p); err != nil {
+		_, _ = fmt.Fprintln(stderr, err.Error())
+		return ExitInternal
+	}
+	return exit
+}
+
+func runGenericRetrieval(p parsed, version string, stdout, stderr io.Writer) int {
+	if err := rejectUnknownFlags(p); err != nil {
+		_, _ = fmt.Fprintln(stderr, err.Error())
+		return ExitInvalidArgument
+	}
+	if p.Filter != "" || p.SearchDB != "" {
+		_, _ = fmt.Fprintln(stderr, "--filter and --search-db are only valid for tanso zhihu web")
+		return ExitInvalidArgument
+	}
+	cfg, err := config.Load(config.Options{Path: p.ConfigPath})
+	if err != nil {
+		return writeCommandError(stdout, stderr, p, tansoerr.ConfigInvalid, err.Error(), ExitConfig)
+	}
+	text, sourceIDs, err := genericQueryAndSources(p, cfg)
+	if err != nil {
+		_, _ = fmt.Fprintln(stderr, err.Error())
+		return ExitInvalidArgument
+	}
+	runners, err := genericRunners(sourceIDs, cfg, p)
+	if err != nil {
+		_, _ = fmt.Fprintln(stderr, err.Error())
+		return ExitInvalidArgument
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), commandTimeout(p, cfg))
+	defer cancel()
+
+	results := []search.Result{}
+	statuses := []search.SourceStatus{}
+	errorsOut := []tansoerr.Error{}
+	for _, runner := range runners {
+		sourceStart := time.Now()
+		sourceResults, callErr := runner.run(ctx)
+		results = append(results, sourceResults...)
+		status := sourceStatus(runner.source, runner.effectiveLimit, time.Since(sourceStart).Milliseconds(), sourceResults, callErr)
+		statuses = append(statuses, status)
+		errorsOut = append(errorsOut, errorsFor(callErr)...)
+	}
+	overall, _, exit := search.Decide(statuses)
+
+	env := search.Envelope{
+		Version: version,
+		Query: search.Query{
+			Text:    text,
+			Mode:    queryModeFor(runners),
+			Sources: sourceIDs,
+			Limit:   requestedLimit(p, cfg),
+		},
+		Status:       overall,
+		Results:      results,
+		SourceStatus: statuses,
+		Errors:       errorsOut,
+	}
+	if err := writeEnvelope(stdout, stderr, env, p); err != nil {
 		_, _ = fmt.Fprintln(stderr, err.Error())
 		return ExitInternal
 	}
@@ -351,6 +615,13 @@ type retrieval struct {
 	source         search.SourceID
 	mode           search.QueryMode
 	requestedLimit int
+	effectiveLimit int
+	run            func(context.Context) ([]search.Result, error)
+}
+
+type sourceRunner struct {
+	source         search.SourceID
+	mode           search.QueryMode
 	effectiveLimit int
 	run            func(context.Context) ([]search.Result, error)
 }
@@ -458,6 +729,163 @@ func zhihuHotRetrieval(cfg config.Config, limit int) retrieval {
 	}
 }
 
+func genericQueryAndSources(p parsed, cfg config.Config) (string, []search.SourceID, error) {
+	var queryParts []string
+	if p.Command == "all" {
+		queryParts = p.Positionals
+	} else {
+		queryParts = append([]string{p.Command}, p.Positionals...)
+	}
+	text, err := singleQuery(queryParts, "tanso")
+	if err != nil {
+		return "", nil, err
+	}
+
+	if len(p.SourceIDs) > 0 {
+		sourceIDs := make([]search.SourceID, 0, len(p.SourceIDs))
+		for _, raw := range p.SourceIDs {
+			sourceID, err := parseGenericSource(raw)
+			if err != nil {
+				return "", nil, err
+			}
+			sourceIDs = append(sourceIDs, sourceID)
+		}
+		return text, sourceIDs, nil
+	}
+	if p.Command == "all" {
+		return text, allQuerySources(cfg), nil
+	}
+	sourceIDs := make([]search.SourceID, 0, len(cfg.Search.DefaultSourceIDs))
+	for _, raw := range cfg.Search.DefaultSourceIDs {
+		sourceID, err := parseGenericSource(raw)
+		if err != nil {
+			return "", nil, err
+		}
+		sourceIDs = append(sourceIDs, sourceID)
+	}
+	if len(sourceIDs) == 0 {
+		return "", nil, fmt.Errorf("no default sources configured")
+	}
+	return text, sourceIDs, nil
+}
+
+func allQuerySources(cfg config.Config) []search.SourceID {
+	sourceIDs := []search.SourceID{}
+	if cfg.Bocha.Enabled {
+		sourceIDs = append(sourceIDs, search.SourceBochaWeb)
+	}
+	if cfg.Volcengine.Enabled {
+		sourceIDs = append(sourceIDs, search.SourceVolcengineAnswer)
+	}
+	if cfg.Zhihu.Enabled {
+		sourceIDs = append(sourceIDs, search.SourceZhihuSearch, search.SourceZhihuWeb)
+	}
+	return sourceIDs
+}
+
+func parseGenericSource(raw string) (search.SourceID, error) {
+	switch raw {
+	case "bocha", string(search.SourceBochaWeb):
+		return search.SourceBochaWeb, nil
+	case "volc", "volcengine", string(search.SourceVolcengineAnswer):
+		return search.SourceVolcengineAnswer, nil
+	case "zhihu", string(search.SourceZhihuSearch):
+		return search.SourceZhihuSearch, nil
+	case string(search.SourceZhihuWeb):
+		return search.SourceZhihuWeb, nil
+	default:
+		return "", fmt.Errorf("unsupported generic source: %s", raw)
+	}
+}
+
+func genericRunners(sourceIDs []search.SourceID, cfg config.Config, p parsed) ([]sourceRunner, error) {
+	runners := make([]sourceRunner, 0, len(sourceIDs))
+	for _, sourceID := range sourceIDs {
+		runner, err := genericRunner(sourceID, cfg, p)
+		if err != nil {
+			return nil, err
+		}
+		runners = append(runners, runner)
+	}
+	if len(runners) == 0 {
+		return nil, fmt.Errorf("no sources selected")
+	}
+	return runners, nil
+}
+
+func genericRunner(sourceID search.SourceID, cfg config.Config, p parsed) (sourceRunner, error) {
+	limit := requestedLimit(p, cfg)
+	switch sourceID {
+	case search.SourceBochaWeb:
+		text := genericText(p)
+		client := bocha.New(cfg.Bocha.APIKey, cfg.Bocha.Endpoint)
+		return sourceRunner{
+			source:         search.SourceBochaWeb,
+			mode:           search.QueryModeSearch,
+			effectiveLimit: limit,
+			run: func(ctx context.Context) ([]search.Result, error) {
+				return client.Search(ctx, search.SearchQuery{Text: text, Limit: limit, Language: cfg.Search.Language})
+			},
+		}, nil
+	case search.SourceVolcengineAnswer:
+		text := genericText(p)
+		client := volcengine.Client{Endpoint: cfg.Volcengine.Endpoint, APIKey: cfg.Volcengine.APIKey, Model: cfg.Volcengine.Model}
+		return sourceRunner{
+			source:         search.SourceVolcengineAnswer,
+			mode:           search.QueryModeAnswer,
+			effectiveLimit: limit,
+			run: func(ctx context.Context) ([]search.Result, error) {
+				return client.Answer(ctx, search.AnswerQuery{Text: text, Limit: limit, Language: cfg.Search.Language})
+			},
+		}, nil
+	case search.SourceZhihuSearch:
+		text := genericText(p)
+		client := zhihu.Client{EndpointBase: cfg.Zhihu.EndpointBase, AccessSecret: cfg.Zhihu.AccessSecret}
+		return sourceRunner{
+			source:         search.SourceZhihuSearch,
+			mode:           search.QueryModeSearch,
+			effectiveLimit: clamp(limit, 1, 10),
+			run: func(ctx context.Context) ([]search.Result, error) {
+				return client.Search(ctx, search.SearchQuery{Text: text, Limit: limit, Language: cfg.Search.Language})
+			},
+		}, nil
+	case search.SourceZhihuWeb:
+		text := genericText(p)
+		client := zhihu.Client{EndpointBase: cfg.Zhihu.EndpointBase, AccessSecret: cfg.Zhihu.AccessSecret}
+		return sourceRunner{
+			source:         search.SourceZhihuWeb,
+			mode:           search.QueryModeSearch,
+			effectiveLimit: clamp(limit, 1, 20),
+			run: func(ctx context.Context) ([]search.Result, error) {
+				return client.GlobalSearch(ctx, search.SearchQuery{Text: text, Limit: limit, Language: cfg.Search.Language})
+			},
+		}, nil
+	default:
+		return sourceRunner{}, fmt.Errorf("source %s is not valid for generic query", sourceID)
+	}
+}
+
+func genericText(p parsed) string {
+	if p.Command == "all" {
+		return strings.Join(p.Positionals, " ")
+	}
+	return strings.Join(append([]string{p.Command}, p.Positionals...), " ")
+}
+
+func queryModeFor(runners []sourceRunner) search.QueryMode {
+	if len(runners) == 1 {
+		return runners[0].mode
+	}
+	return search.QueryModeMixed
+}
+
+func requestedLimit(p parsed, cfg config.Config) int {
+	if p.LimitSet {
+		return p.Limit
+	}
+	return cfg.Search.Limit
+}
+
 func sourceStatus(source search.SourceID, effectiveLimit int, durationMS int64, results []search.Result, err error) search.SourceStatus {
 	status := search.SourceStatusOK
 	var ferr *tansoerr.Error
@@ -510,14 +938,55 @@ func statusForError(err tansoerr.Error) search.SourceStatusValue {
 	}
 }
 
-func writeEnvelope(stdout io.Writer, env search.Envelope, p parsed) error {
+func writeEnvelope(stdout, stderr io.Writer, env search.Envelope, p parsed) error {
 	if p.JSON || p.Raw {
 		return output.WriteJSON(stdout, env)
+	}
+	if env.Status != search.StatusOK {
+		if err := writeHumanErrors(stderr, env); err != nil {
+			return err
+		}
+		if env.Status == search.StatusError {
+			return nil
+		}
 	}
 	if p.Markdown {
 		return output.WriteMarkdown(stdout, env)
 	}
 	return output.WriteTable(stdout, env)
+}
+
+func writeHumanErrors(stderr io.Writer, env search.Envelope) error {
+	for _, item := range env.Errors {
+		source := ""
+		if item.Source != "" {
+			source = " [" + item.Source + "]"
+		}
+		if _, err := fmt.Fprintf(stderr, "error%s: %s: %s\n", source, item.Code, item.Message); err != nil {
+			return err
+		}
+	}
+	if len(env.Errors) == 0 {
+		_, err := fmt.Fprintln(stderr, "error: command returned no results")
+		return err
+	}
+	return nil
+}
+
+func writeCommandError(stdout, stderr io.Writer, p parsed, code, message string, exit int) int {
+	if p.JSON {
+		_ = output.WriteJSON(stdout, map[string]any{
+			"status": "error",
+			"errors": []tansoerr.Error{{
+				Code:      code,
+				Message:   message,
+				Retryable: false,
+			}},
+		})
+		return exit
+	}
+	_, _ = fmt.Fprintln(stderr, message)
+	return exit
 }
 
 func singleQuery(args []string, usage string) (string, error) {
@@ -535,15 +1004,30 @@ func parseTimeout(value string) time.Duration {
 	return timeout
 }
 
+func commandTimeout(p parsed, cfg config.Config) time.Duration {
+	if p.Timeout != "" {
+		return parseTimeout(p.Timeout)
+	}
+	return parseTimeout(cfg.Search.Timeout)
+}
+
+func validateTimeout(p parsed) error {
+	if p.Timeout == "" {
+		return nil
+	}
+	timeout, err := time.ParseDuration(p.Timeout)
+	if err != nil || timeout <= 0 {
+		return fmt.Errorf("--timeout must be a positive duration")
+	}
+	return nil
+}
+
 func validateHelp(p parsed) error {
 	if err := rejectUnknownFlags(p); err != nil {
 		return err
 	}
 	if p.JSON || p.Markdown || p.Table || p.Raw {
 		return fmt.Errorf("output flags are not valid for tanso help")
-	}
-	if len(p.Positionals) > 0 {
-		return fmt.Errorf("unexpected argument for tanso help: %s", p.Positionals[0])
 	}
 	return nil
 }
@@ -663,6 +1147,16 @@ func validateOutputModes(p parsed) error {
 	return nil
 }
 
+func validateSourceFlag(p parsed) error {
+	if len(p.SourceIDs) == 0 {
+		return nil
+	}
+	if isGenericCommand(p) {
+		return nil
+	}
+	return fmt.Errorf("--source is only valid for generic tanso <query> or tanso all <query>")
+}
+
 func isRetrievalCommand(p parsed) bool {
 	switch p.Command {
 	case "bocha", "volc", "zhihu", "hot":
@@ -673,11 +1167,29 @@ func isRetrievalCommand(p parsed) bool {
 }
 
 func isConfigInitCommand(p parsed) bool {
+	if p.Command == "init" {
+		return true
+	}
 	return p.Command == "config" && len(p.Positionals) > 0 && p.Positionals[0] == "init"
 }
 
-func isZhihuWebCommand(args []string) bool {
-	return len(args) >= 2 && args[0] == "zhihu" && args[1] == "web"
+func isZhihuWebCommand(p parsed) bool {
+	return p.Command == "zhihu" && len(p.Positionals) > 0 && p.Positionals[0] == "web"
+}
+
+func isGenericCommand(p parsed) bool {
+	if p.Command == "" {
+		return false
+	}
+	if p.Command == "all" {
+		return true
+	}
+	switch p.Command {
+	case "help", "version", "sources", "skills", "config", "init", "bocha", "volc", "zhihu", "hot":
+		return false
+	default:
+		return true
+	}
 }
 
 func writeSourcesText(stdout io.Writer) {

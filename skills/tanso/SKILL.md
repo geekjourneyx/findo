@@ -31,6 +31,8 @@ Use the narrowest source that matches the task:
 
 | Need | Command |
 | --- | --- |
+| Multi-source default search | `tanso "<query>" --json --limit 5` |
+| All search and answer sources | `tanso all "<query>" --json --limit 5` |
 | Broad web evidence | `tanso bocha "<query>" --json --limit 5` |
 | Web-grounded direct answer | `tanso volc "<query>" --json --limit 1` |
 | Zhihu opinions and discussions | `tanso zhihu "<query>" --json --limit 5` |
@@ -39,6 +41,7 @@ Use the narrowest source that matches the task:
 | Available source IDs | `tanso sources --json` |
 
 Use Zhihu for opinion-rich questions, Bocha for broad corroboration, Volcengine for synthesized direct answers, and hotlist for current attention.
+Use `tanso --help` or `tanso <command> --help` to inspect the installed command surface before assuming a command exists.
 
 For Zhihu global search only, filters are valid:
 
@@ -100,6 +103,6 @@ When one provider fails, continue with configured alternatives if the user asked
 
 - Do not scrape browsers or websites when a Tanso provider can answer the task.
 - Do not use `--filter` or `--search-db` outside `tanso zhihu web`.
-- Do not treat `tanso sources --json` as proof that credentials work; it is only source inventory.
+- Do not treat `tanso sources --json` as proof that credentials work; `configured` only means local credential material is present.
 - Do not present one provider's output as verified fact when sources conflict.
 - Do not expand a narrow question into broad trend research unless the user asks for topic discovery.
