@@ -253,13 +253,13 @@ make smoke-zhihu
 
 Tanso v1.0.0 intentionally does not implement browser scraping, cache, reranking, plugin runtime, MCP, stdin query input, Bocha image search, or Zhihu direct answer. Those boundaries keep the CLI small, testable, and stable.
 
-## 作者
-
-- 主页：[jieni.ai](https://jieni.ai)
-- GitHub：[@geekjourneyx](https://github.com/geekjourneyx)
-- X：[@seekjourney](https://x.com/seekjourney)
-- 公众号：极客杰尼
-
 ## License
 
 [MIT](./LICENSE)
+
+## Author
+
+- Website: [jieni.ai](https://jieni.ai)
+- GitHub: [@geekjourneyx](https://github.com/geekjourneyx)
+- X: [@seekjourney](https://x.com/seekjourney)
+- WeChat Official Account: 极客杰尼
